@@ -17,6 +17,8 @@ data class FixtureEntity(
     val date: String,
     val time: String,
     val status: String = "Scheduled",
+    val tossWinner: String = "",
+    val tossDecision: String = "",
     val currentRuns: Int = 0,
     val currentWickets: Int = 0,
     val oversBowled: String = "0.0",

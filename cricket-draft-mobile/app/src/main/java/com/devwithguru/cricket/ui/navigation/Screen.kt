@@ -4,11 +4,17 @@ sealed interface Screen {
     object Login : Screen
     object Onboarding : Screen
     object Home : Screen
-    object CreateMatch : Screen
+    data class CreateMatch(val tournamentId: String? = null) : Screen
     object CreateTournament : Screen
     object MyTournaments : Screen
-    data class TournamentHub(val tournamentId: String) : Screen
-    data class TeamDetail(val teamId: String) : Screen
+    data class AddTeam(val tournamentId: String) : Screen
+    data class CreateStage(val tournamentId: String, val stageNumber: Int = 1) : Screen
+    data class ScheduleMatch(val tournamentId: String) : Screen
+    data class TournamentHub(val tournamentId: String, val initialTab: Int = 0) : Screen
+    data class TournamentSetup(val tournamentId: String, val hasDraft: Boolean = true) : Screen
+    data class TournamentRegistration(val tournamentId: String, val tournamentName: String) : Screen
+    data class DraftRoom(val tournamentId: String, val isAdmin: Boolean = true) : Screen
+    data class TeamDetail(val teamId: String, val initialTab: Int = 0) : Screen
     data class Toss(val matchId: String, val homeTeam: String, val awayTeam: String) : Screen
     data class TossLineup(
         val matchId: String,

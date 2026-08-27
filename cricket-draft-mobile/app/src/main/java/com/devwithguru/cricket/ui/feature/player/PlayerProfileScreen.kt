@@ -37,6 +37,10 @@ fun PlayerProfileScreen(
     LaunchedEffect(playerId) { viewModel.loadPlayer(playerId) }
     val registeredPlayer by viewModel.player.collectAsState()
     val playerName = registeredPlayer?.name ?: "Unknown Player"
+    val playerStats by viewModel.stats.collectAsState()
+    val playerInsights by viewModel.insights.collectAsState()
+    val playerMatches by viewModel.matches.collectAsState()
+    val playerTeams by viewModel.teams.collectAsState()
 
     Scaffold(
         topBar = {
@@ -131,13 +135,19 @@ fun PlayerProfileScreen(
                         .weight(1f)
                 ) { page ->
                     when (page) {
-                        0 -> PlayerOverviewTab(playerName = playerName)
-                        1 -> PlayerStatsTab()
-                        2 -> PlayerMatchesTab(
-                            onStartScheduledMatch = onStartScheduledMatch
+                        0 -> PlayerOverviewTab(
+                            playerId = playerId,
+                            playerName = playerName,
+                            stats = playerStats,
+                            insights = playerInsights
                         )
-                        3 -> PlayerTeamsTab()
-                        4 -> PlayerTournamentsTab()
+                        1 -> PlayerStatsTab(stats = playerStats)
+                        2 -> PlayerMatchesTab(
+                            onStartScheduledMatch = onStartScheduledMatch,
+                            matchData = playerMatches
+                        )
+                        3 -> PlayerTeamsTab(teams = playerTeams)
+                        4 -> PlayerTournamentsTab(teams = playerTeams)
                     }
                 }
             }

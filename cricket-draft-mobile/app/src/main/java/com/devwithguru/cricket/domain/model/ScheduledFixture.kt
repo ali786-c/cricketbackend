@@ -16,6 +16,8 @@ data class ScheduledFixture(
     val date: String,
     val time: String,
     var status: String = "Scheduled", // "Scheduled", "Live", "Completed"
+    var tossWinner: String = "",
+    var tossDecision: String = "",
     var currentRuns: Int = 0,
     var currentWickets: Int = 0,
     var oversBowled: String = "0.0",

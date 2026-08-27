@@ -15,26 +15,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class StandingRow(
-    val pos: Int,
-    val team: String,
-    val p: Int,
-    val w: Int,
-    val l: Int,
-    val pts: Int,
-    val nrr: String
-)
+import com.devwithguru.cricket.data.api.TournamentStandingData
 
 @Composable
-fun TournamentStandingsTab() {
-    val standings = listOf(
-        StandingRow(1, "Islamabad Blasters", 3, 3, 0, 6, "+1.24"),
-        StandingRow(2, "Ali Panthers", 3, 2, 1, 4, "+0.45"),
-        StandingRow(3, "Rawalpindi Kings", 3, 1, 2, 2, "-0.15"),
-        StandingRow(4, "Karachi Tigers", 3, 0, 3, 0, "-1.54")
-    )
-
+fun TournamentStandingsTab(
+    standings: List<TournamentStandingData> = emptyList()
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,71 +34,87 @@ fun TournamentStandingsTab() {
             fontWeight = FontWeight.Bold
         )
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                // Table Header Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.02f))
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Pos", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    Text(text = "Team", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(4f))
-                    Text(text = "P", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Text(text = "W", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Text(text = "L", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Text(text = "Pts", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
-                    Text(text = "NRR", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
-
-                // Table Rows
-                standings.forEach { row ->
-                    val isQualifying = row.pos <= 2
+        if (standings.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No standings available yet",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    fontSize = 13.sp
+                )
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Table Header
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (isQualifying) MaterialTheme.colorScheme.primary.copy(alpha = 0.03f) else Color.Transparent)
-                            .padding(vertical = 12.dp, horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.02f))
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "${row.pos}", color = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (isQualifying) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.weight(4f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = row.team,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = if (isQualifying) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Text(text = "${row.p}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                        Text(text = "${row.w}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                        Text(text = "${row.l}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                        Text(text = "${row.pts}", color = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
-                        Text(text = row.nrr, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
+                        Text(text = "Pos", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text(text = "Team", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(4f))
+                        Text(text = "P", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        Text(text = "W", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        Text(text = "L", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        Text(text = "Pts", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
+                        Text(text = "NRR", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+
+                    // Table Rows
+                    standings.forEach { standing ->
+                        val pos = standing.position ?: 0
+                        val teamName = standing.team?.name ?: "Unknown"
+                        val isQualifying = pos <= 2
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (isQualifying) MaterialTheme.colorScheme.primary.copy(alpha = 0.03f) else Color.Transparent)
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "$pos", color = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (isQualifying) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.weight(4f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = teamName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (isQualifying) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Text(text = "${standing.played}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            Text(text = "${standing.wins}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            Text(text = "${standing.losses}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            Text(text = "${standing.points}", color = if (isQualifying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
+                            Text(text = String.format("%.2f", standing.net_run_rate ?: 0.0), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    }
                 }
             }
         }

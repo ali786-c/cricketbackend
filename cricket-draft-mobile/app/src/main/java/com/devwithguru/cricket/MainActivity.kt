@@ -19,9 +19,15 @@ import com.devwithguru.cricket.ui.feature.auth.LoginScreen
 import com.devwithguru.cricket.ui.feature.auth.PlayerOnboardingScreen
 import com.devwithguru.cricket.ui.feature.home.UnifiedHomeScreen
 import com.devwithguru.cricket.ui.feature.match.screens.CreateMatchScreen
+import com.devwithguru.cricket.ui.feature.tournament.AddTeamScreen
+import com.devwithguru.cricket.ui.feature.tournament.CreateStageScreen
+import com.devwithguru.cricket.ui.feature.tournament.ScheduleMatchScreen
 import com.devwithguru.cricket.ui.feature.tournament.CreateTournamentScreen
 import com.devwithguru.cricket.ui.feature.tournament.MyTournamentsScreen
 import com.devwithguru.cricket.ui.feature.tournament.TournamentHubScreen
+import com.devwithguru.cricket.ui.feature.tournament.TournamentSetupScreen
+import com.devwithguru.cricket.ui.feature.tournament.TournamentRegistrationScreen
+import com.devwithguru.cricket.ui.feature.tournament.DraftRoomScreen
 import com.devwithguru.cricket.ui.feature.team.TeamDetailScreen
 import com.devwithguru.cricket.ui.feature.match.toss.TossLineupScreen
 import com.devwithguru.cricket.ui.feature.match.toss.TossScreen
@@ -84,7 +90,7 @@ class MainActivity : ComponentActivity() {
                             LoginScreen(
                                 onLoginSuccess = { email ->
                                     loggedInEmail = email
-                                    navigationViewModel.clearAndNavigateTo(Screen.Home)
+                                    navigationViewModel.navigateBack()
                                     Toast.makeText(context, String.format(msgLoggedInFormat, email), Toast.LENGTH_SHORT).show()
                                 },
                                 onNavigateToRegister = {
@@ -96,7 +102,7 @@ class MainActivity : ComponentActivity() {
                             PlayerOnboardingScreen(
                                 onSubmitRegistration = { name, role, batting, bowling, city, bio ->
                                     Toast.makeText(context, String.format(msgRegisteredFormat, name, role), Toast.LENGTH_LONG).show()
-                                    navigationViewModel.clearAndNavigateTo(Screen.Home)
+                                    navigationViewModel.navigateBack()
                                 },
                                 onNavigateBack = {
                                     if (navigationViewModel.currentScreen == Screen.Onboarding) {
@@ -111,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                 isDarkTheme = isDarkTheme,
                                 onToggleTheme = { isDarkTheme = it },
                                 onNavigateToCreateMatch = {
-                                    navigationViewModel.navigateTo(Screen.CreateMatch)
+                                    navigationViewModel.navigateTo(Screen.CreateMatch())
                                 },
                                 onNavigateToCreateTournament = {
                                     navigationViewModel.navigateTo(Screen.CreateTournament)
@@ -144,13 +150,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        Screen.CreateMatch -> {
+                        is Screen.CreateMatch -> {
                             CreateMatchScreen(
+                                tournamentId = screen.tournamentId,
                                 onCreateMatchSuccess = { matchId, home, away, overs, ballType, date, time ->
                                     navigationViewModel.navigateTo(Screen.Toss(matchId, home, away))
                                 },
                                 onNavigateBack = {
-                                    if (navigationViewModel.currentScreen == Screen.CreateMatch) {
+                                    if (navigationViewModel.currentScreen is Screen.CreateMatch) {
                                         navigationViewModel.navigateBack()
                                     }
                                 }
@@ -158,16 +165,60 @@ class MainActivity : ComponentActivity() {
                         }
                         Screen.CreateTournament -> {
                             CreateTournamentScreen(
-                                onCreateTournamentSuccess = { name, city, season, start, end, ballType ->
-                                    Toast.makeText(context, String.format(msgCreatedTournamentFormat, name, city, season, ballType), Toast.LENGTH_LONG).show()
-                                    if (navigationViewModel.currentScreen == Screen.CreateTournament) {
-                                        navigationViewModel.navigateBack()
+                                onCreateTournamentSuccess = { tournamentId, name, hasDraft ->
+                                    Toast.makeText(context, "Tournament \"$name\" created!", Toast.LENGTH_SHORT).show()
+                                    if (hasDraft) {
+                                        navigationViewModel.navigateTo(Screen.TournamentSetup(tournamentId, true))
+                                    } else {
+                                        navigationViewModel.navigateTo(Screen.TournamentHub(tournamentId))
                                     }
                                 },
                                 onNavigateBack = {
-                                    if (navigationViewModel.currentScreen == Screen.CreateTournament) {
+                                    if (navigationViewModel.currentScreen is Screen.CreateTournament) {
                                         navigationViewModel.navigateBack()
                                     }
+                                }
+                            )
+                        }
+                        is Screen.TournamentSetup -> {
+                            TournamentSetupScreen(
+                                tournamentId = screen.tournamentId,
+                                onNavigateToDraft = { tid ->
+                                    navigationViewModel.navigateTo(Screen.DraftRoom(tid))
+                                },
+                                onNavigateToTournamentHub = { tid ->
+                                    navigationViewModel.navigateTo(Screen.TournamentHub(tid))
+                                },
+                                onNavigateBack = {
+                                    if (navigationViewModel.currentScreen is Screen.TournamentSetup) {
+                                        navigationViewModel.navigateBack()
+                                    }
+                                }
+                            )
+                        }
+                        is Screen.TournamentRegistration -> {
+                            TournamentRegistrationScreen(
+                                tournamentId = screen.tournamentId,
+                                tournamentName = screen.tournamentName,
+                                onNavigateBack = {
+                                    if (navigationViewModel.currentScreen is Screen.TournamentRegistration) {
+                                        navigationViewModel.navigateBack()
+                                    }
+                                }
+                            )
+                        }
+                        is Screen.DraftRoom -> {
+                            DraftRoomScreen(
+                                tournamentId = screen.tournamentId,
+                                isAdmin = screen.isAdmin,
+                                onNavigateBack = {
+                                    if (navigationViewModel.currentScreen is Screen.DraftRoom) {
+                                        navigationViewModel.navigateBack()
+                                    }
+                                },
+                                onDraftCompleted = { tournamentId ->
+                                    Toast.makeText(context, "Draft completed!", Toast.LENGTH_SHORT).show()
+                                    navigationViewModel.navigateTo(Screen.TournamentHub(tournamentId))
                                 }
                             )
                         }
@@ -176,8 +227,12 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToCreateTournament = {
                                     navigationViewModel.navigateTo(Screen.CreateTournament)
                                 },
-                                onNavigateToTournamentHub = { id ->
-                                    navigationViewModel.navigateTo(Screen.TournamentHub(id))
+                                onNavigateToTournament = { id, status, hasDraft ->
+                                    if (hasDraft && (status == "draft" || status == "registration" || status == "ready")) {
+                                        navigationViewModel.navigateTo(Screen.TournamentSetup(id, true))
+                                    } else {
+                                        navigationViewModel.navigateTo(Screen.TournamentHub(id))
+                                    }
                                 },
                                 onNavigateBack = {
                                     if (navigationViewModel.currentScreen == Screen.MyTournaments) {
@@ -189,11 +244,45 @@ class MainActivity : ComponentActivity() {
                         is Screen.TournamentHub -> {
                             TournamentHubScreen(
                                 tournamentId = screen.tournamentId,
+                                initialTab = screen.initialTab,
+                                onTabChanged = { newTab ->
+                                    navigationViewModel.updateCurrentScreen(
+                                        oldScreen = screen,
+                                        newScreen = screen.copy(initialTab = newTab)
+                                    )
+                                },
                                 onNavigateToTeamDetail = { teamId ->
                                     navigationViewModel.navigateTo(Screen.TeamDetail(teamId))
                                 },
                                 onNavigateToMatchCenter = { matchId ->
                                     navigationViewModel.navigateTo(Screen.MatchCenter(matchId = matchId, isScorer = false))
+                                },
+                                 onStartMatch = { matchId, home, away, status, tossWinner, tossDecision ->
+                                     if (status.lowercase() == "toss_completed" && !tossWinner.isNullOrBlank() && !tossDecision.isNullOrBlank()) {
+                                         navigationViewModel.navigateTo(
+                                             Screen.TossLineup(
+                                                 matchId = matchId,
+                                                 homeTeam = home,
+                                                 awayTeam = away,
+                                                 tossWinner = tossWinner,
+                                                 tossDecision = tossDecision
+                                             )
+                                         )
+                                     } else {
+                                         navigationViewModel.navigateTo(Screen.Toss(matchId, home, away))
+                                     }
+                                 },
+                                onScheduleMatch = { tournamentId ->
+                                    navigationViewModel.navigateTo(Screen.ScheduleMatch(tournamentId))
+                                },
+                                onCreateGroup = { tournamentId ->
+                                    Toast.makeText(context, "Create Group coming soon", Toast.LENGTH_SHORT).show()
+                                },
+                                onAddTeam = { tournamentId ->
+                                    navigationViewModel.navigateTo(Screen.AddTeam(tournamentId))
+                                },
+                                onCreateStage = { tournamentId ->
+                                    navigationViewModel.navigateTo(Screen.CreateStage(tournamentId))
                                 },
                                 onNavigateBack = {
                                     if (navigationViewModel.currentScreen is Screen.TournamentHub) {
@@ -202,9 +291,105 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                        is Screen.AddTeam -> {
+                            // Get existing teams from ViewModel for duplicate check
+                            val setupVm: com.devwithguru.cricket.ui.feature.tournament.TournamentSetupViewModel = hiltViewModel()
+                            val existingTeams by setupVm.teams.collectAsState()
+
+                            AddTeamScreen(
+                                tournamentId = screen.tournamentId,
+                                existingTeams = existingTeams,
+                                onTeamCreated = { name, shortName, captain, viceCaptain, manager ->
+                                    setupVm.createTeam(
+                                        tournamentId = screen.tournamentId,
+                                        name = name,
+                                        shortName = shortName,
+                                        captainName = captain,
+                                        viceCaptainName = viceCaptain,
+                                        managerName = manager
+                                    )
+                                    navigationViewModel.navigateBack()
+                                },
+                                onTeamJoinedByCode = { code ->
+                                    Toast.makeText(context, "Team code '$code' — feature coming soon", Toast.LENGTH_SHORT).show()
+                                },
+                                onNavigateBack = {
+                                    navigationViewModel.navigateBack()
+                                }
+                            )
+                        }
+                        is Screen.CreateStage -> {
+                            val stageVm: com.devwithguru.cricket.ui.feature.tournament.StageViewModel = hiltViewModel()
+                            LaunchedEffect(screen.tournamentId) {
+                                stageVm.setTournamentId(screen.tournamentId)
+                            }
+
+                            CreateStageScreen(
+                                tournamentId = screen.tournamentId,
+                                stageNumber = screen.stageNumber,
+                                onStageCreated = { name, type, numTeams, matchesPerTeam, pointsWin, pointsTie, qualRule, qualCount ->
+                                    stageVm.createStage(
+                                        name = name,
+                                        type = type,
+                                        numberOfTeams = numTeams,
+                                        matchesPerTeam = matchesPerTeam,
+                                        pointsWin = pointsWin,
+                                        pointsTie = pointsTie,
+                                        qualificationRule = qualRule,
+                                        qualificationCount = qualCount
+                                    )
+                                    navigationViewModel.navigateBack()
+                                },
+                                onNavigateBack = {
+                                    navigationViewModel.navigateBack()
+                                }
+                            )
+                        }
+                        is Screen.ScheduleMatch -> {
+                            val fixtureVm: com.devwithguru.cricket.ui.feature.tournament.FixtureViewModel = hiltViewModel()
+                            LaunchedEffect(screen.tournamentId) {
+                                fixtureVm.setTournamentId(screen.tournamentId)
+                            }
+                            val scheduleStages by fixtureVm.stages.collectAsState()
+                            val tournamentVm: com.devwithguru.cricket.ui.feature.tournament.TournamentViewModel = hiltViewModel()
+                            LaunchedEffect(screen.tournamentId) { tournamentVm.loadTournament(screen.tournamentId) }
+                            val scheduleTeams by tournamentVm.teams.collectAsState()
+
+                            ScheduleMatchScreen(
+                                tournamentId = screen.tournamentId,
+                                stages = scheduleStages,
+                                teams = scheduleTeams,
+                                onMatchScheduled = { stageId, homeId, homeName, awayId, awayName, date, time, venue, matchType ->
+                                    fixtureVm.scheduleMatch(
+                                        stageId = stageId,
+                                        stageName = scheduleStages.find { it.id == stageId }?.name,
+                                        homeTeamId = homeId,
+                                        homeTeamName = homeName,
+                                        awayTeamId = awayId,
+                                        awayTeamName = awayName,
+                                        date = date,
+                                        time = time,
+                                        venue = venue,
+                                        matchType = matchType
+                                    )
+                                    Toast.makeText(context, "$homeName vs $awayName scheduled!", Toast.LENGTH_SHORT).show()
+                                    navigationViewModel.navigateBack()
+                                },
+                                onNavigateBack = {
+                                    navigationViewModel.navigateBack()
+                                }
+                            )
+                        }
                         is Screen.TeamDetail -> {
                             TeamDetailScreen(
                                 teamId = screen.teamId,
+                                initialTab = screen.initialTab,
+                                onTabChanged = { newTab ->
+                                    navigationViewModel.updateCurrentScreen(
+                                        oldScreen = screen,
+                                        newScreen = screen.copy(initialTab = newTab)
+                                    )
+                                },
                                 onNavigateToPlayerDetail = { playerId ->
                                     navigationViewModel.navigateTo(Screen.PlayerProfile(playerId))
                                 },
@@ -220,6 +405,7 @@ class MainActivity : ComponentActivity() {
                                 homeTeamName = screen.homeTeam,
                                 awayTeamName = screen.awayTeam,
                                 onTossComplete = { winner, decision ->
+                                    mainViewModel.saveTossDetails(screen.matchId, winner, decision)
                                     navigationViewModel.navigateTo(
                                         Screen.TossLineup(
                                             matchId = screen.matchId,
@@ -240,6 +426,7 @@ class MainActivity : ComponentActivity() {
                         is Screen.TossLineup -> {
                             LaunchedEffect(screen.matchId) { mainViewModel.loadFixture(screen.matchId) }
                             TossLineupScreen(
+                                matchId = screen.matchId,
                                 homeTeamName = screen.homeTeam,
                                 awayTeamName = screen.awayTeam,
                                 tossWinner = screen.tossWinner,
@@ -320,8 +507,9 @@ class MainActivity : ComponentActivity() {
                                             f.currentWickets = wickets
                                             f.oversBowled = overs
                                             Toast.makeText(context, msgMatchCompletedResultsSaved, Toast.LENGTH_LONG).show()
-                                            // Pop back to Home
-                                            navigationViewModel.clearAndNavigateTo(Screen.Home)
+                                            // Go back to previous screen (Hub or Home)
+                                            navigationViewModel.navigateBack()
+                                            navigationViewModel.navigateBack()
                                         }
                                         // Persist fixture changes to Room
                                         mainViewModel.updateFixture(f)

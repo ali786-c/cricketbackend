@@ -7,20 +7,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.SportsCricket
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.data.api.TournamentStandingData
 
 @Composable
-fun TournamentStatisticsTab() {
+fun TournamentStatisticsTab(
+    standings: List<TournamentStandingData> = emptyList()
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -28,30 +31,64 @@ fun TournamentStatisticsTab() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Batting Leaderboard
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Most Runs (Top Batsmen)",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
+        // Tournament Summary
+        if (standings.isNotEmpty()) {
+            val totalMatches = standings.sumOf { it.played } / 2 // each match counted for 2 teams
+            val totalWins = standings.sumOf { it.wins }
+            val totalLosses = standings.sumOf { it.losses }
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Batter 1
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Tournament Summary",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        StatItem("Teams", "${standings.size}")
+                        StatItem("Matches", "$totalMatches")
+                        StatItem("Decided", "$totalWins")
+                        StatItem("Tied/NR", "${totalMatches - totalWins}")
+                    }
+                }
+            }
+
+            // Best NRR
+            val bestNrr = standings.maxByOrNull { it.net_run_rate ?: Double.MIN_VALUE }
+            if (bestNrr != null && (bestNrr.net_run_rate ?: 0.0) > 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Best Net Run Rate",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -59,75 +96,51 @@ fun TournamentStatisticsTab() {
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.EmojiEvents, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             }
                             Column {
-                                Text(text = "Ahmed Ali", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "Ali Panthers", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                Text(
+                                    text = bestNrr.team?.name ?: "Unknown",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "NRR: ${String.format("%.2f", bestNrr.net_run_rate)} • ${bestNrr.wins}W-${bestNrr.losses}L",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp
+                                )
                             }
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(text = "324 Runs", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "SR: 142.1", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                        }
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-
-                    // Batter 2
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                            }
-                            Column {
-                                Text(text = "Bilal Butt", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "Rawalpindi Kings", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                            }
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(text = "210 Runs", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "SR: 128.5", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                         }
                     }
                 }
             }
-        }
 
-        // Bowling Leaderboard
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Most Wickets (Top Bowlers)",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Most Consistent (highest win %)
+            val mostConsistent = standings.filter { it.played > 0 }
+                .maxByOrNull { it.wins.toFloat() / it.played }
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Bowler 1
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            if (mostConsistent != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Most Consistent Team",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -135,49 +148,59 @@ fun TournamentStatisticsTab() {
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SportsCricket, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.PieChart, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             }
                             Column {
-                                Text(text = "Yasir Khan", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "Islamabad Blasters", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                Text(
+                                    text = mostConsistent.team?.name ?: "Unknown",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                val winPct = if (mostConsistent.played > 0) (mostConsistent.wins * 100f / mostConsistent.played).toInt() else 0
+                                Text(
+                                    text = "Win Rate: $winPct% • ${mostConsistent.points} pts",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp
+                                )
                             }
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(text = "14 Wkts", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Econ: 5.8", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                        }
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-
-                    // Bowler 2
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.SportsCricket, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                            }
-                            Column {
-                                Text(text = "Usman Shinwari", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "Ali Panthers", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                            }
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(text = "9 Wkts", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Econ: 6.9", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                         }
                     }
                 }
             }
         }
+
+        // Empty state
+        if (standings.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No statistics available yet",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

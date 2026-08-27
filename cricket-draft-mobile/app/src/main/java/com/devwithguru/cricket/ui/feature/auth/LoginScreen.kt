@@ -39,7 +39,13 @@ fun LoginScreen(
     var isPasswordVisible by remember { mutableStateOf(false) }
     val authState by viewModel.uiState.collectAsState()
 
-    // Navigate on successful login
+    // Auto-login from cache if token exists (works offline)
+    // This sets isLoggedIn=true which triggers the LaunchedEffect below
+    LaunchedEffect(Unit) {
+        viewModel.autoLoginFromCache()
+    }
+
+    // Navigate on successful login (handles both API login and cache auto-login)
     LaunchedEffect(authState.isLoggedIn) {
         if (authState.isLoggedIn) {
             onLoginSuccess(authState.userEmail)

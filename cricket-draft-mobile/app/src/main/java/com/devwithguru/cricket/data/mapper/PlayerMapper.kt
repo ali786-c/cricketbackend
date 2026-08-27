@@ -7,12 +7,14 @@ fun PlayerEntity.toDomain() = RegisteredPlayer(
     id = id,
     name = name,
     role = role,
-    isRegistered = isRegistered
+    isRegistered = isRegistered,
+    teamId = teamId
 )
 
 fun RegisteredPlayer.toEntity() = PlayerEntity(
     id = id,
     name = name,
     role = role,
-    isRegistered = isRegistered
+    isRegistered = isRegistered,
+    teamId = teamId
 )

@@ -37,7 +37,24 @@ class TournamentRepository @Inject constructor(
         tournamentDao.updateTournament(tournament.toEntity())
     }
 
+    suspend fun updateTournamentTeamCount(id: String, count: Int) {
+        tournamentDao.updateTeamCount(id, count)
+    }
+
     suspend fun deleteTournament(tournament: Tournament) {
         tournamentDao.deleteTournament(tournament.toEntity())
+    }
+
+    suspend fun generateUniqueLocalId(): String {
+        var uniqueId = ""
+        do {
+            val randomNum = (100000..999999).random()
+            val candidateId = randomNum.toString()
+            val exists = tournamentDao.findById(candidateId) != null
+            if (!exists) {
+                uniqueId = candidateId
+            }
+        } while (uniqueId.isEmpty())
+        return uniqueId
     }
 }

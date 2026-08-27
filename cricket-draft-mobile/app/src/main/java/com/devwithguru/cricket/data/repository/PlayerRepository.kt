@@ -22,17 +22,39 @@ class PlayerRepository @Inject constructor(
     suspend fun findById(id: String): RegisteredPlayer? =
         playerDao.findById(id)?.toDomain()
 
-    suspend fun registerPlayer(name: String, role: String, isRegistered: Boolean = false): RegisteredPlayer {
-        val currentCount = playerDao.count()
-        val newId = "p${currentCount + 1}"
+    suspend fun registerPlayer(name: String, role: String, isRegistered: Boolean = false, teamId: String? = null): RegisteredPlayer {
+        val newId = (100000..999999).random().toString()
         val entity = com.devwithguru.cricket.data.db.entity.PlayerEntity(
             id = newId,
             name = name,
             role = role,
-            isRegistered = isRegistered
+            isRegistered = isRegistered,
+            teamId = teamId
         )
         playerDao.insertPlayer(entity)
         return entity.toDomain()
+    }
+
+    suspend fun registerPlayerWithTeam(name: String, role: String, teamId: String, isRegistered: Boolean = false): RegisteredPlayer {
+        val newId = (100000..999999).random().toString()
+        val entity = com.devwithguru.cricket.data.db.entity.PlayerEntity(
+            id = newId,
+            name = name,
+            role = role,
+            isRegistered = isRegistered,
+            teamId = teamId
+        )
+        playerDao.insertPlayer(entity)
+        return entity.toDomain()
+    }
+
+    fun getPlayersByTeam(teamId: String): Flow<List<RegisteredPlayer>> =
+        playerDao.getPlayersByTeam(teamId, teamId.hashCode().toString()).map { entities ->
+            entities.map { it.toDomain() }
+        }
+
+    suspend fun assignPlayerToTeam(playerId: String, teamId: String?) {
+        playerDao.updateTeamId(playerId, teamId)
     }
 
     suspend fun exists(id: String): Boolean = playerDao.exists(id)

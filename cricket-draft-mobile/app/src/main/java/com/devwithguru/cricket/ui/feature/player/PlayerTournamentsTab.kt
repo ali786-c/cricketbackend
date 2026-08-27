@@ -13,25 +13,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class PlayerTournamentLog(
-    val tournamentName: String,
-    val status: String,
-    val isWinner: Boolean = false
-)
+import com.devwithguru.cricket.data.api.PlayerTeamData
 
 @Composable
-fun PlayerTournamentsTab() {
-    val tournaments = listOf(
-        PlayerTournamentLog("Premier Cricket Cup 2026", "Active - Group Stage"),
-        PlayerTournamentLog("Summer Smash 2025", "Concluded - Semi Finalists"),
-        PlayerTournamentLog("Super League 2024", "Concluded - Champions", true)
-    )
+fun PlayerTournamentsTab(
+    teams: List<PlayerTeamData> = emptyList()
+) {
+    // Extract unique tournaments from team data
+    val tournaments = teams
+        .mapNotNull { it.tournament_name }
+        .distinct()
+        .map { name ->
+            val teamCount = teams.count { it.tournament_name == name }
+            TournamentInfo(
+                name = name,
+                teamCount = teamCount,
+                isActive = teams.any { it.tournament_name == name && (it.is_captain == true || (it.matches_played ?: 0) > 0) }
+            )
+        }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -48,60 +51,77 @@ fun PlayerTournamentsTab() {
             )
         }
 
-        items(tournaments) { tour ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = if (tour.isWinner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
+        if (tournaments.isEmpty()) {
+            item {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No tournaments joined yet",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        } else {
+            items(tournaments) { tour ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = if (tour.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    if (tour.isWinner) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-                                ),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = if (tour.isWinner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = tour.tournamentName,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = tour.status,
-                                color = if (tour.isWinner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        if (tour.isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = if (tour.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tour.name,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${tour.teamCount} team(s) • ${if (tour.isActive) "Active" else "Completed"}",
+                                    color = if (tour.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -109,3 +129,9 @@ fun PlayerTournamentsTab() {
         }
     }
 }
+
+private data class TournamentInfo(
+    val name: String,
+    val teamCount: Int,
+    val isActive: Boolean
+)

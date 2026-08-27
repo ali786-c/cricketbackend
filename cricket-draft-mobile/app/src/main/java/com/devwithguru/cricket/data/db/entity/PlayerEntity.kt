@@ -9,5 +9,6 @@ data class PlayerEntity(
     val id: String,
     val name: String,
     val role: String,
-    val isRegistered: Boolean = false
+    val isRegistered: Boolean = false,
+    val teamId: String? = null
 )

@@ -24,16 +24,26 @@ class MainViewModel @Inject constructor(
 
     fun loadFixture(matchId: String) {
         viewModelScope.launch {
-            _currentFixture.value = fixtureRepository.getFixtureById(matchId)
+            _currentFixture.value = fixtureRepository.getScheduledFixtureById(matchId)
         }
     }
 
-    fun getFixture(matchId: String): ScheduledFixture? = _currentFixture.value?.takeIf { it.id == matchId }
+    fun getFixture(matchId: String): ScheduledFixture? {
+        val current = _currentFixture.value ?: return null
+        val matches = current.id == matchId || current.id.hashCode().toString() == matchId
+        return if (matches) current else null
+    }
 
     fun updateFixture(fixture: ScheduledFixture) {
         viewModelScope.launch {
             fixtureRepository.updateFixture(fixture)
             _currentFixture.value = fixture
+        }
+    }
+
+    fun saveTossDetails(matchId: String, winner: String, decision: String) {
+        viewModelScope.launch {
+            fixtureRepository.saveTossDetails(matchId, winner, decision)
         }
     }
 }

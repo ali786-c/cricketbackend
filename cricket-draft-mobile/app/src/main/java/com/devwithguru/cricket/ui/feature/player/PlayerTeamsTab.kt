@@ -18,21 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class PlayerTeamLog(
-    val teamName: String,
-    val duration: String,
-    val isCurrent: Boolean = false
-)
+import com.devwithguru.cricket.data.api.PlayerTeamData
 
 @Composable
-fun PlayerTeamsTab() {
-    val teams = listOf(
-        PlayerTeamLog("Ali Panthers", "2026 - Present", true),
-        PlayerTeamLog("Lahore Kings", "2025 - 2026"),
-        PlayerTeamLog("Rawalpindi Stars", "2024 - 2025")
-    )
-
+fun PlayerTeamsTab(
+    teams: List<PlayerTeamData> = emptyList()
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -48,75 +39,106 @@ fun PlayerTeamsTab() {
             )
         }
 
-        items(teams) { team ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = if (team.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
+        if (teams.isEmpty()) {
+            item {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No teams joined yet",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        } else {
+            items(teams) { team ->
+                val isCurrent = team.is_captain == true || team.matches_played != null
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    if (team.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-                                ),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = if (team.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = team.team_name ?: "Unknown Team",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val subtitle = buildString {
+                                    team.tournament_name?.let { append(it) }
+                                    team.role?.let {
+                                        if (isNotEmpty()) append(" • ")
+                                        append(it)
+                                    }
+                                    team.matches_played?.let {
+                                        if (isNotEmpty()) append(" • ")
+                                        append("$it matches")
+                                    }
+                                }
+                                if (subtitle.isNotEmpty()) {
+                                    Text(
+                                        text = subtitle,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = team.teamName,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = team.duration,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                    if (team.isCurrent) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "Current",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        if (isCurrent) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Active",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

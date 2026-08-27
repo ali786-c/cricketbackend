@@ -48,6 +48,7 @@ import com.devwithguru.cricket.domain.model.ScheduledFixture
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateMatchScreen(
+    tournamentId: String? = null,
     onCreateMatchSuccess: (matchId: String, homeTeam: String, awayTeam: String, overs: Int, ballType: String, date: String, time: String) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: CreateMatchViewModel = hiltViewModel()

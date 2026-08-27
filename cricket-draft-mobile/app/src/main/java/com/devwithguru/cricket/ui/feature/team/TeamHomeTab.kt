@@ -4,11 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,20 +20,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.data.api.SquadPlayerData
+import com.devwithguru.cricket.domain.model.Team
 
+/**
+ * Team Home Tab — PRD §10-§11
+ * Shows team overview with captain, vice-captain, manager, status, and squad preview.
+ */
 @Composable
-fun TeamHomeTab() {
+fun TeamHomeTab(
+    team: Team? = null,
+    squad: List<SquadPlayerData> = emptyList()
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Team Profile Summary Card
+        // ── Team Profile Card ──
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -39,7 +51,7 @@ fun TeamHomeTab() {
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -48,162 +60,116 @@ fun TeamHomeTab() {
                 ) {
                     Column {
                         Text(
-                            text = "Team Overview",
+                            text = team?.name ?: "Team",
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Founded: 2024",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
+                        if (team?.shortName?.isNotBlank() == true) {
+                            Text(
+                                text = team.shortName,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (team?.tournamentName?.isNotBlank() == true) {
+                            Text(
+                                text = "Tournament: ${team.tournamentName}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        } else if (team?.tournamentId?.isNotBlank() == true) {
+                            Text(
+                                text = "Tournament ID: ${team.tournamentId}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                     }
+                    // Team Logo
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = "Logo",
-                            tint = MaterialTheme.colorScheme.primary
+                        Text(
+                            text = (team?.shortName ?: team?.name?.take(3) ?: "?").take(3).uppercase(),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
+                // Unique Team ID Display
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
                         Text(
-                            text = "OWNER",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "TEAM UNIQUE ID",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                         Text(
-                            text = "Ahmed Ali",
-                            color = MaterialTheme.colorScheme.onSurface,
+                            text = team?.id ?: "Unknown",
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "RECORD",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "15 Wins / 5 Losses",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
         }
 
-        // Top Performers Section (Responsive Weights)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Top Performers",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // ── Team Officials (PRD §10) ──
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Batter
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "Top Batter",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Ahmed Ali",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "324 Runs (Avg: 64.8)",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+                Text(
+                    text = "Team Officials",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-                // Bowler
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "Top Bowler",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Usman Shinwari",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "9 Wickets (Econ: 6.9)",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+                // Captain
+                OfficialRow(
+                    label = "Captain",
+                    name = team?.captainName,
+                    icon = Icons.Default.Star
+                )
+
+                // Vice-Captain
+                OfficialRow(
+                    label = "Vice-Captain",
+                    name = team?.viceCaptainName,
+                    icon = Icons.Default.Shield
+                )
             }
         }
 
-        // Schedule Preview Section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Upcoming Match",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-
+        // ── Squad Preview ──
+        if (squad.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -212,7 +178,7 @@ fun TeamHomeTab() {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
@@ -221,43 +187,185 @@ fun TeamHomeTab() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "vs Islamabad Blasters",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 14.sp,
+                            text = "Squad (${squad.size} players)",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                    }
+
+                    squad.take(5).forEach { player ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "Group Stage",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = player.player_name ?: "Unknown",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                player.playing_role?.let { role ->
+                                    Text(
+                                        text = role,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            if (player.is_captain == true) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        "C",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            if (player.is_vice_captain == true) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        "VC",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            if (player.is_wicketkeeper == true) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        "WK",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         }
                     }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.CalendarToday, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                            Text("Aug 22, 2026", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                        }
-                        Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("5:00 PM", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+
+                    if (squad.size > 5) {
+                        Text(
+                            text = "View all ${squad.size} players →",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                    Text(
-                        text = "Venue: Rawalpindi Stadium",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
                 }
             }
         }
+
+        // ── Stats Summary ──
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem("Players", "${team?.playerCount ?: squad.size}")
+                StatItem("Wins", "${team?.wins ?: 0}")
+                StatItem("Losses", "${team?.losses ?: 0}")
+                StatItem("Points", "${team?.points ?: 0}")
+            }
+        }
+
+        // Empty state if no team data
+        if (team == null && squad.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Loading team info...",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfficialRow(label: String, name: String?, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (name != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            modifier = Modifier.size(16.dp)
+        )
+        Column {
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = name ?: "Not assigned",
+                color = if (name != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

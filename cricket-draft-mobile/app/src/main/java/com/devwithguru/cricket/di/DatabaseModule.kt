@@ -70,10 +70,15 @@ object DatabaseModule {
     @Provides fun provideTeamDao(db: CricketDatabase): TeamDao = db.teamDao()
     @Provides fun provideSyncStatusDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.SyncStatusDao = db.syncStatusDao()
     @Provides fun providePendingChangeDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.PendingChangeDao = db.pendingChangeDao()
+    @Provides fun provideAdminTeamDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminTeamDao = db.adminTeamDao()
+    @Provides fun provideAdminPlayerDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminPlayerDao = db.adminPlayerDao()
+    @Provides fun provideAdminFixtureDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminFixtureDao = db.adminFixtureDao()
+    @Provides fun provideAdminDraftSetupDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminDraftSetupDao = db.adminDraftSetupDao()
+    @Provides fun provideStageDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.StageDao = db.stageDao()
 
     @Provides
     @Named("auth_token")
-    fun provideAuthToken(authRepository: com.devwithguru.cricket.data.repository.AuthRepository): String? = authRepository.getToken()
+    fun provideAuthToken(authRepository: com.devwithguru.cricket.data.repository.AuthRepository): () -> String? = { authRepository.getToken() }
 
     private fun defaultPlayers(): List<PlayerEntity> = listOf(
         PlayerEntity("h1", "Ahmed Ali", "Batter", true),

@@ -1,10 +1,13 @@
 package com.devwithguru.cricket.di
 
 import com.devwithguru.cricket.data.api.ApiService
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -42,14 +45,29 @@ object NetworkModule {
             .connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .addHeader("Accept", "application/json")
-                    .addHeader("Content-Type", "application/json")
-                    .build()
-                chain.proceed(request)
+                // Safety: catch any SecurityException/RuntimeException from network
+                try {
+                    val request = chain.request().newBuilder()
+                        .addHeader("Accept", "application/json")
+                        .addHeader("Content-Type", "application/json")
+                        .build()
+                    chain.proceed(request)
+                } catch (e: SecurityException) {
+                    // Return a fake 503 response instead of crashing
+                    okhttp3.Response.Builder()
+                        .code(503)
+                        .message("Network unavailable")
+                        .protocol(okhttp3.Protocol.HTTP_1_1)
+                        .request(chain.request())
+                        .body(okhttp3.ResponseBody.create(
+                            "application/json".toMediaType(),
+                            "{\"error\":\"Network permission not granted\"}"
+                        ))
+                        .build()
+                }
             }
+            .addInterceptor(loggingInterceptor)
             .build()
     }
 
@@ -67,5 +85,11 @@ object NetworkModule {
     @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService {
         return retrofit.create(ApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return GsonBuilder().create()
     }
 }

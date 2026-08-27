@@ -15,5 +15,9 @@ data class TeamEntity(
     val wins: Int = 0,
     val losses: Int = 0,
     val ties: Int = 0,
-    val foundedYear: String = ""
+    val foundedYear: String = "",
+    val captainName: String? = null,
+    val viceCaptainName: String? = null,
+    val wicketkeeperName: String? = null,
+    val creatorId: Int? = null
 )

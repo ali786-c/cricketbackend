@@ -43,14 +43,16 @@ class AuthRepository @Inject constructor(
 
     // ─── User Data ─────────────────────────────────────────
 
-    fun saveUserData(name: String, email: String, roles: List<String>) {
+    fun saveUserData(id: Int, name: String, email: String, roles: List<String>) {
         prefs.edit()
+            .putInt(KEY_USER_ID, id)
             .putString(KEY_USER_NAME, name)
             .putString(KEY_USER_EMAIL, email)
             .putStringSet(KEY_USER_ROLES, roles.toSet())
             .apply()
     }
 
+    fun getUserId(): Int = prefs.getInt(KEY_USER_ID, -1)
     fun getUserName(): String = prefs.getString(KEY_USER_NAME, "") ?: ""
     fun getUserEmail(): String = prefs.getString(KEY_USER_EMAIL, "") ?: ""
     fun getUserRoles(): Set<String> = prefs.getStringSet(KEY_USER_ROLES, emptySet()) ?: emptySet()
@@ -71,7 +73,7 @@ class AuthRepository @Inject constructor(
                     // Save token
                     saveToken(body.token)
                     // Save user data
-                    saveUserData(body.data.name, body.data.email, body.data.roles)
+                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles)
                     Result.success(body)
                 } else {
                     Result.failure(Exception("Empty response from server"))
@@ -95,7 +97,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    saveUserData(body.data.name, body.data.email, body.data.roles)
+                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles)
                     Result.success(body.data)
                 } else {
                     Result.failure(Exception("Empty response"))
@@ -140,6 +142,7 @@ class AuthRepository @Inject constructor(
     companion object {
         private const val PREFS_NAME = "cricket_auth_prefs"
         private const val KEY_TOKEN = "auth_token"
+        private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_ROLES = "user_roles"

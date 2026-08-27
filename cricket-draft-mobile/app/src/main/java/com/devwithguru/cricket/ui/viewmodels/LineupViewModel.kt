@@ -3,17 +3,24 @@ package com.devwithguru.cricket.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.devwithguru.cricket.data.repository.PlayerRepository
+import com.devwithguru.cricket.data.repository.FixtureRepository
+import com.devwithguru.cricket.data.repository.TeamRepository
+import com.devwithguru.cricket.data.repository.TournamentRepository
 import com.devwithguru.cricket.ui.feature.match.toss.PlayerSelectable
 import com.devwithguru.cricket.domain.model.RegisteredPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class LineupViewModel @Inject constructor(
-    private val playerRepository: PlayerRepository
+    private val playerRepository: PlayerRepository,
+    private val fixtureRepository: FixtureRepository,
+    private val teamRepository: TeamRepository,
+    private val tournamentRepository: TournamentRepository
 ) : ViewModel() {
 
     private val _homeSquad = MutableStateFlow<List<PlayerSelectable>>(emptyList())
@@ -24,6 +31,50 @@ class LineupViewModel @Inject constructor(
 
     private val _searchResult = MutableStateFlow<RegisteredPlayer?>(null)
     val searchResult: StateFlow<RegisteredPlayer?> = _searchResult
+
+    private val _squadSize = MutableStateFlow(11)
+    val squadSize: StateFlow<Int> = _squadSize
+
+    var homeTeamId: String = ""
+        private set
+    var awayTeamId: String = ""
+        private set
+
+    fun loadSquadsForMatch(matchId: String) {
+        _homeSquad.value = emptyList()
+        _awaySquad.value = emptyList()
+        _squadSize.value = 11
+        viewModelScope.launch {
+            val adminFixture = fixtureRepository.getAdminFixtureById(matchId)
+            if (adminFixture != null) {
+                val originalHomeId = teamRepository.resolveOriginalTeamId(adminFixture.homeTeamId)
+                val originalAwayId = teamRepository.resolveOriginalTeamId(adminFixture.awayTeamId)
+                homeTeamId = originalHomeId
+                awayTeamId = originalAwayId
+                
+                val tournament = tournamentRepository.getTournamentById(adminFixture.tournamentId)
+                if (tournament != null) {
+                    _squadSize.value = tournament.squadSize
+                }
+                
+                playerRepository.getPlayersByTeam(originalHomeId).collect { list ->
+                    _homeSquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            val adminFixture = fixtureRepository.getAdminFixtureById(matchId)
+            if (adminFixture != null) {
+                val originalHomeId = teamRepository.resolveOriginalTeamId(adminFixture.homeTeamId)
+                val originalAwayId = teamRepository.resolveOriginalTeamId(adminFixture.awayTeamId)
+                homeTeamId = originalHomeId
+                awayTeamId = originalAwayId
+                playerRepository.getPlayersByTeam(originalAwayId).collect { list ->
+                    _awaySquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                }
+            }
+        }
+    }
 
     fun loadDefaultSquads() {
         viewModelScope.launch {
@@ -49,15 +100,17 @@ class LineupViewModel @Inject constructor(
         _searchResult.value = null
     }
 
-    fun registerNewPlayer(name: String, role: String, forHomeTeam: Boolean) {
+    fun registerNewPlayer(name: String, role: String, forHomeTeam: Boolean, onComplete: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val registered = playerRepository.registerPlayer(name, role)
+            val targetTeamId = if (forHomeTeam) homeTeamId else awayTeamId
+            val registered = playerRepository.registerPlayer(name, role, teamId = targetTeamId.takeIf { it.isNotBlank() })
             val selectable = PlayerSelectable(registered.id, registered.name, registered.role)
             if (forHomeTeam) {
                 _homeSquad.value = _homeSquad.value + selectable
             } else {
                 _awaySquad.value = _awaySquad.value + selectable
             }
+            onComplete(registered.id)
         }
     }
 

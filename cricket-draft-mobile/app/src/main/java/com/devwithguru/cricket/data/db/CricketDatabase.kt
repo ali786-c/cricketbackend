@@ -12,6 +12,11 @@ import com.devwithguru.cricket.data.db.dao.TournamentDao
 import com.devwithguru.cricket.data.db.dao.TeamDao
 import com.devwithguru.cricket.data.db.dao.PlayerDao
 import com.devwithguru.cricket.data.db.dao.WicketEventDao
+import com.devwithguru.cricket.data.db.dao.AdminTeamDao
+import com.devwithguru.cricket.data.db.dao.AdminPlayerDao
+import com.devwithguru.cricket.data.db.dao.AdminFixtureDao
+import com.devwithguru.cricket.data.db.dao.AdminDraftSetupDao
+import com.devwithguru.cricket.data.db.dao.StageDao
 import com.devwithguru.cricket.data.db.entity.BatterStatsEntity
 import com.devwithguru.cricket.data.db.entity.BowlerStatsEntity
 import com.devwithguru.cricket.data.db.entity.FixtureEntity
@@ -21,6 +26,11 @@ import com.devwithguru.cricket.data.db.entity.TournamentEntity
 import com.devwithguru.cricket.data.db.entity.TeamEntity
 import com.devwithguru.cricket.data.db.entity.PlayerEntity
 import com.devwithguru.cricket.data.db.entity.WicketEventEntity
+import com.devwithguru.cricket.data.db.entity.AdminTeamEntity
+import com.devwithguru.cricket.data.db.entity.AdminPlayerEntity
+import com.devwithguru.cricket.data.db.entity.AdminFixtureEntity
+import com.devwithguru.cricket.data.db.entity.AdminDraftSetupEntity
+import com.devwithguru.cricket.data.db.entity.StageEntity
 import com.devwithguru.cricket.data.db.entity.SyncStatusEntity
 import com.devwithguru.cricket.data.db.entity.PendingChangeEntity
 import com.devwithguru.cricket.data.db.dao.SyncStatusDao
@@ -38,9 +48,14 @@ import com.devwithguru.cricket.data.db.dao.PendingChangeDao
         TournamentEntity::class,
         TeamEntity::class,
         SyncStatusEntity::class,
-        PendingChangeEntity::class
+        PendingChangeEntity::class,
+        AdminTeamEntity::class,
+        AdminPlayerEntity::class,
+        AdminFixtureEntity::class,
+        AdminDraftSetupEntity::class,
+        StageEntity::class
     ],
-    version = 3,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -56,4 +71,9 @@ abstract class CricketDatabase : RoomDatabase() {
     abstract fun teamDao(): TeamDao
     abstract fun syncStatusDao(): SyncStatusDao
     abstract fun pendingChangeDao(): PendingChangeDao
+    abstract fun adminTeamDao(): AdminTeamDao
+    abstract fun adminPlayerDao(): AdminPlayerDao
+    abstract fun adminFixtureDao(): AdminFixtureDao
+    abstract fun adminDraftSetupDao(): AdminDraftSetupDao
+    abstract fun stageDao(): StageDao
 }

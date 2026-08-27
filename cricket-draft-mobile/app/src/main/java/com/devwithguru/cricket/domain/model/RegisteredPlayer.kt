@@ -8,5 +8,6 @@ data class RegisteredPlayer(
     val id: String,
     val name: String,
     val role: String,
-    val isRegistered: Boolean = false // true = has an account/login, false = added manually
+    val isRegistered: Boolean = false, // true = has an account/login, false = added manually
+    val teamId: String? = null
 )

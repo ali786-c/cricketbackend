@@ -50,30 +50,40 @@ class PlayerProfileViewModel @Inject constructor(
     fun loadPlayer(playerId: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            // Try Room first (instant, always works)
             try {
-                // Try Room first
-                _player.value = playerRepository.findById(playerId)
+                var localPlayer = playerRepository.findById(playerId)
+                if (localPlayer != null) {
+                    _player.value = localPlayer
+                }
+            } catch (_: Exception) { }
 
-                // Fetch from API
-                val token = authRepository.getRawToken()?.let { "Bearer $it" }
+            // Try each API call individually — one failure shouldn't kill the rest
+            val token = try {
+                authRepository.getRawToken()?.let { "Bearer $it" }
+            } catch (_: Exception) { null }
 
-                val statsResult = playerApiRepository.getPlayerStats(playerId, token)
-                statsResult.onSuccess { _stats.value = it }
+            try {
+                val result = playerApiRepository.getPlayerStats(playerId, token)
+                result.onSuccess { _stats.value = it }
+            } catch (_: Exception) { }
 
-                val insightsResult = playerApiRepository.getPlayerInsights(playerId, token)
-                insightsResult.onSuccess { _insights.value = it }
+            try {
+                val result = playerApiRepository.getPlayerInsights(playerId, token)
+                result.onSuccess { _insights.value = it }
+            } catch (_: Exception) { }
 
-                val matchesResult = playerApiRepository.getPlayerMatches(playerId, token)
-                matchesResult.onSuccess { _matches.value = it }
+            try {
+                val result = playerApiRepository.getPlayerMatches(playerId, token)
+                result.onSuccess { _matches.value = it }
+            } catch (_: Exception) { }
 
-                val teamsResult = playerApiRepository.getPlayerTeams(playerId, token)
-                teamsResult.onSuccess { _teams.value = it }
+            try {
+                val result = playerApiRepository.getPlayerTeams(playerId, token)
+                result.onSuccess { _teams.value = it }
+            } catch (_: Exception) { }
 
-            } catch (e: Exception) {
-                _error.value = e.message
-            } finally {
-                _isLoading.value = false
-            }
+            _isLoading.value = false
         }
     }
 
@@ -82,7 +92,10 @@ class PlayerProfileViewModel @Inject constructor(
      */
     fun loadPlayerFromRoom(playerId: String) {
         viewModelScope.launch {
-            _player.value = playerRepository.findById(playerId)
+            var localPlayer = playerRepository.findById(playerId)
+            if (localPlayer != null) {
+                _player.value = localPlayer
+            }
         }
     }
 }

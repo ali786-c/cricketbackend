@@ -13,7 +13,11 @@ fun TeamEntity.toDomain() = Team(
     wins = wins,
     losses = losses,
     ties = ties,
-    foundedYear = foundedYear
+    foundedYear = foundedYear,
+    captainName = captainName,
+    viceCaptainName = viceCaptainName,
+    wicketkeeperName = wicketkeeperName,
+    creatorId = creatorId
 )
 
 fun Team.toEntity() = TeamEntity(
@@ -26,5 +30,9 @@ fun Team.toEntity() = TeamEntity(
     wins = wins,
     losses = losses,
     ties = ties,
-    foundedYear = foundedYear
+    foundedYear = foundedYear,
+    captainName = captainName,
+    viceCaptainName = viceCaptainName,
+    wicketkeeperName = wicketkeeperName,
+    creatorId = creatorId
 )

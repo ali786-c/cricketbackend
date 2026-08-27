@@ -31,6 +31,7 @@ import com.devwithguru.cricket.ui.components.PremiumMatchCard
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.devwithguru.cricket.ui.feature.player.PlayerMatchesViewModel
+import com.devwithguru.cricket.ui.feature.player.PlayerProfileViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ fun UnifiedHomeScreen(
     isDarkTheme: Boolean = false,
     onToggleTheme: (Boolean) -> Unit = {},
     viewModel: PlayerMatchesViewModel = hiltViewModel(),
+    profileViewModel: PlayerProfileViewModel = hiltViewModel(),
     onNavigateToCreateMatch: () -> Unit,
     onNavigateToCreateTournament: () -> Unit,
     onNavigateToMyTournaments: () -> Unit,
@@ -54,6 +56,9 @@ fun UnifiedHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var activeTab by remember { mutableStateOf("Hub") }
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
+    // Load current user's profile stats for the profile card
+    LaunchedEffect(Unit) { profileViewModel.loadPlayer("p1") }
+    val profileStats by profileViewModel.stats.collectAsState()
     val liveFixtures by viewModel.fixtures.collectAsState()
     val pagerState = rememberPagerState(pageCount = { maxOf(liveFixtures.size, 1) })
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -367,11 +372,11 @@ fun UnifiedHomeScreen(
 
                 MyProfileQuickAccessCard(
                     playerName = userName.split("@").first().capitalize(),
-                    role = "All-rounder",
-                    matches = "12",
-                    runs = "324",
-                    wickets = "14",
-                    rating = 0.85f,
+                    role = "Player",
+                    matches = profileStats?.matches?.toString() ?: "--",
+                    runs = profileStats?.runs?.toString() ?: "--",
+                    wickets = profileStats?.wickets?.toString() ?: "--",
+                    rating = 0f,
                     onClick = onNavigateToPlayerProfile
                 )
             }

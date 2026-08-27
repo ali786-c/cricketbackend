@@ -28,7 +28,7 @@ class MatchApiRepository @Inject constructor(
      */
     fun getMatchState(matchId: String): Flow<ScheduledFixture?> = flow {
         // 1. Emit cached data first (from Room)
-        val cached = fixtureRepository.getFixtureById(matchId)
+        val cached = fixtureRepository.getScheduledFixtureById(matchId)
         emit(cached)
 
         // 2. Try fetching from API
@@ -39,7 +39,26 @@ class MatchApiRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    val fixture = body.data.toScheduledFixture(matchId)
+                    var fixture = body.data.toScheduledFixture(matchId)
+
+                    // Merge with cached values to preserve correct team names, venue, date, time, and squad info
+                    if (cached != null) {
+                        val finalHome = if (fixture.homeTeam == "Team A" || fixture.homeTeam == "TBD" || fixture.homeTeam.isBlank()) {
+                            cached.homeTeam
+                        } else fixture.homeTeam
+
+                        val finalAway = if (fixture.awayTeam == "Team B" || fixture.awayTeam == "TBD" || fixture.awayTeam.isBlank()) {
+                            cached.awayTeam
+                        } else fixture.awayTeam
+
+                        fixture = fixture.copy(
+                            homeTeam = finalHome,
+                            awayTeam = finalAway,
+                            venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
+                            date = if (fixture.date.isBlank()) cached.date else fixture.date,
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time
+                        )
+                    }
 
                     // Save to Room for offline access
                     fixtureRepository.saveFixture(fixture)
@@ -61,6 +80,7 @@ class MatchApiRepository @Inject constructor(
      * Force refresh from API (for pull-to-refresh or manual refresh).
      */
     suspend fun refreshMatchState(matchId: String): ScheduledFixture? {
+        val cached = fixtureRepository.getScheduledFixtureById(matchId)
         return try {
             val token = authTokenProvider()
             val response = apiService.getMatchState(matchId, token)
@@ -68,7 +88,27 @@ class MatchApiRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    val fixture = body.data.toScheduledFixture(matchId)
+                    var fixture = body.data.toScheduledFixture(matchId)
+
+                    // Merge with cached values to preserve correct team names, venue, date, time, and squad info
+                    if (cached != null) {
+                        val finalHome = if (fixture.homeTeam == "Team A" || fixture.homeTeam == "TBD" || fixture.homeTeam.isBlank()) {
+                            cached.homeTeam
+                        } else fixture.homeTeam
+
+                        val finalAway = if (fixture.awayTeam == "Team B" || fixture.awayTeam == "TBD" || fixture.awayTeam.isBlank()) {
+                            cached.awayTeam
+                        } else fixture.awayTeam
+
+                        fixture = fixture.copy(
+                            homeTeam = finalHome,
+                            awayTeam = finalAway,
+                            venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
+                            date = if (fixture.date.isBlank()) cached.date else fixture.date,
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time
+                        )
+                    }
+
                     fixtureRepository.saveFixture(fixture)
                     _matchCache.value = _matchCache.value + (matchId to fixture)
                     fixture
@@ -76,7 +116,7 @@ class MatchApiRepository @Inject constructor(
             } else null
         } catch (e: Exception) {
             // Fallback to Room
-            fixtureRepository.getFixtureById(matchId)
+            cached
         }
     }
 

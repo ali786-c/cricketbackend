@@ -32,6 +32,7 @@ class AuthViewModel @Inject constructor(
 
     /**
      * Login with email/password.
+     * OFFLINE-FIRST: If API fails but we have cached token, allow login.
      */
     fun login(email: String, password: String) {
         viewModelScope.launch {
@@ -50,32 +51,50 @@ class AuthViewModel @Inject constructor(
                     )
                 },
                 onFailure = { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message ?: "Login failed"
-                    )
+                    // OFFLINE FALLBACK: If we have a cached token, allow login anyway
+                    // User can use app offline with previously cached data
+                    if (authRepository.isLoggedIn()) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isLoggedIn = true,
+                            userName = authRepository.getUserName(),
+                            userEmail = authRepository.getUserEmail(),
+                            error = null
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = e.message ?: "Login failed. Check your internet connection."
+                        )
+                    }
                 }
             )
         }
     }
 
     /**
-     * Logout.
+     * Check if we can auto-login from cache (no internet needed).
      */
+    fun autoLoginFromCache(): Boolean {
+        if (authRepository.isLoggedIn()) {
+            _uiState.value = AuthUiState(
+                isLoggedIn = true,
+                userName = authRepository.getUserName(),
+                userEmail = authRepository.getUserEmail()
+            )
+            return true
+        }
+        return false
+    }
+
     fun logout() {
         authRepository.logout()
         _uiState.value = AuthUiState(isLoggedIn = false)
     }
 
-    /**
-     * Clear error message.
-     */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
 
-    /**
-     * Get auth token for other repositories.
-     */
     fun getToken(): String? = authRepository.getToken()
 }

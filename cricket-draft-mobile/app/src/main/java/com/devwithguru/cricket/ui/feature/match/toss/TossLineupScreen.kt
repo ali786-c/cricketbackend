@@ -37,6 +37,7 @@ data class PlayerSelectable(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TossLineupScreen(
+    matchId: String,
     homeTeamName: String = "Ali Panthers",
     awayTeamName: String = "Islamabad Blasters",
     tossWinner: String = "",
@@ -45,6 +46,11 @@ fun TossLineupScreen(
     onNavigateBack: () -> Unit,
     viewModel: LineupViewModel = hiltViewModel()
 ) {
+    // Load squads for this match
+    LaunchedEffect(matchId) {
+        viewModel.loadSquadsForMatch(matchId)
+    }
+
     // Lineup Tabs
     var selectedTeamTab by remember { mutableStateOf(0) }
     val teams = listOf(homeTeamName, awayTeamName)
@@ -53,59 +59,34 @@ fun TossLineupScreen(
     val homeSquad = remember { mutableStateListOf<PlayerSelectable>() }
     val awaySquad = remember { mutableStateListOf<PlayerSelectable>() }
 
-    // Initialize with some mock players if available
-    LaunchedEffect(Unit) {
-        if (homeSquad.isEmpty()) {
-            // Could be empty for a brand new team
-            // Add some mock players for existing teams
-            homeSquad.addAll(
-                listOf(
-                    PlayerSelectable("h1", "Ahmed Ali", "Batter"),
-                    PlayerSelectable("h2", "Bilal Butt", "Batter"),
-                    PlayerSelectable("h3", "Salman Ahmed", "Wicketkeeper"),
-                    PlayerSelectable("h4", "Usman Shinwari", "Bowler"),
-                    PlayerSelectable("h5", "Zain Abbas", "Batter"),
-                    PlayerSelectable("h6", "Imran Khan", "All-rounder"),
-                    PlayerSelectable("h7", "Farhan Saeed", "Bowler"),
-                    PlayerSelectable("h8", "Riaz Afridi", "Bowler"),
-                    PlayerSelectable("h9", "Asif Iqbal", "Batter"),
-                    PlayerSelectable("h10", "Shoaib Malik", "All-rounder"),
-                    PlayerSelectable("h11", "Wahab Riaz", "Bowler")
-                )
-            )
-        }
-        if (awaySquad.isEmpty()) {
-            awaySquad.addAll(
-                listOf(
-                    PlayerSelectable("a1", "Yasir Khan", "Bowler"),
-                    PlayerSelectable("a2", "Babar Azam", "Batter"),
-                    PlayerSelectable("a3", "Mohammad Rizwan", "Wicketkeeper"),
-                    PlayerSelectable("a4", "Shaheen Afridi", "Bowler"),
-                    PlayerSelectable("a5", "Shadab Khan", "All-rounder"),
-                    PlayerSelectable("a6", "Fakhar Zaman", "Batter"),
-                    PlayerSelectable("a7", "Haris Rauf", "Bowler"),
-                    PlayerSelectable("a8", "Naseem Shah", "Bowler"),
-                    PlayerSelectable("a9", "Iftikhar Ahmed", "All-rounder"),
-                    PlayerSelectable("a10", "Saim Ayub", "Batter"),
-                    PlayerSelectable("a11", "Imad Wasim", "All-rounder")
-                )
-            )
-        }
+    val homeSquadList by viewModel.homeSquad.collectAsState()
+    val awaySquadList by viewModel.awaySquad.collectAsState()
+
+    // Sync local state lists with ViewModel flows
+    LaunchedEffect(homeSquadList) {
+        homeSquad.clear()
+        homeSquad.addAll(homeSquadList)
     }
+    LaunchedEffect(awaySquadList) {
+        awaySquad.clear()
+        awaySquad.addAll(awaySquadList)
+    }
+
+    val squadSize by viewModel.squadSize.collectAsState()
 
     // Selected Player IDs
-    var selectedHomePlayers by remember { mutableStateOf(setOf<String>()) }
-    var selectedAwayPlayers by remember { mutableStateOf(setOf<String>()) }
+    var selectedHomePlayers by remember(matchId) { mutableStateOf(setOf<String>()) }
+    var selectedAwayPlayers by remember(matchId) { mutableStateOf(setOf<String>()) }
 
     // Auto-select all initially
-    LaunchedEffect(homeSquad.size) {
+    LaunchedEffect(homeSquad.size, squadSize) {
         if (selectedHomePlayers.isEmpty() && homeSquad.isNotEmpty()) {
-            selectedHomePlayers = homeSquad.take(11).map { it.id }.toSet()
+            selectedHomePlayers = homeSquad.take(squadSize).map { it.id }.toSet()
         }
     }
-    LaunchedEffect(awaySquad.size) {
+    LaunchedEffect(awaySquad.size, squadSize) {
         if (selectedAwayPlayers.isEmpty() && awaySquad.isNotEmpty()) {
-            selectedAwayPlayers = awaySquad.take(11).map { it.id }.toSet()
+            selectedAwayPlayers = awaySquad.take(squadSize).map { it.id }.toSet()
         }
     }
 
@@ -115,11 +96,11 @@ fun TossLineupScreen(
 
     val currentSquad = if (selectedTeamTab == 0) homeSquad else awaySquad
     val currentSelected = if (selectedTeamTab == 0) selectedHomePlayers else selectedAwayPlayers
-    val currentCount = currentSelected.size
 
-    val homeCount = selectedHomePlayers.size
-    val awayCount = selectedAwayPlayers.size
-    val isFormValid = homeCount >= 2 && awayCount >= 2 // At least 2 players per team minimum
+    val homeCount = homeSquad.count { it.id in selectedHomePlayers }
+    val awayCount = awaySquad.count { it.id in selectedAwayPlayers }
+    val currentCount = if (selectedTeamTab == 0) homeCount else awayCount
+    val isFormValid = homeCount == squadSize && awayCount == squadSize
 
     Scaffold(
         topBar = {
@@ -189,7 +170,7 @@ fun TossLineupScreen(
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isFormValid) "START MATCH" else "Add players to both teams",
+                        text = if (isFormValid) "START MATCH" else "Select $squadSize players for both teams",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -397,16 +378,13 @@ fun TossLineupScreen(
                             selectedAwayPlayers = selectedAwayPlayers + existingId
                         }
                     } else {
-                        // New player — register via ViewModel and add to squad
-                        viewModel.registerNewPlayer(playerName, playerRole, addPlayerForTeam == 0)
-                        val registered = viewModel.searchResult.value
-                        val playerId = registered?.id ?: "p_$(System.currentTimeMillis())"
-                        val newPlayer = PlayerSelectable(playerId, playerName, playerRole)
-                        targetSquad.add(newPlayer)
-                        if (addPlayerForTeam == 0) {
-                            selectedHomePlayers = selectedHomePlayers + playerId
-                        } else {
-                            selectedAwayPlayers = selectedAwayPlayers + playerId
+                        // New player — register via ViewModel and auto-select on completion callback
+                        viewModel.registerNewPlayer(playerName, playerRole, addPlayerForTeam == 0) { playerId ->
+                            if (addPlayerForTeam == 0) {
+                                selectedHomePlayers = selectedHomePlayers + playerId
+                            } else {
+                                selectedAwayPlayers = selectedAwayPlayers + playerId
+                            }
                         }
                     }
                     showAddPlayerDialog = false

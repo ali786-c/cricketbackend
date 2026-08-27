@@ -13,7 +13,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import com.devwithguru.cricket.domain.model.RegisteredPlayer
+import com.devwithguru.cricket.data.api.PlayerStatsDetailData
+import com.devwithguru.cricket.data.api.PlayerInsightsDetailData
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,55 +25,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
-    player: RegisteredPlayer? = null
+fun PlayerOverviewTab(
+    playerId: String = "",
+    playerName: String = "Unknown Player",
+    stats: PlayerStatsDetailData? = null,
+    insights: PlayerInsightsDetailData? = null
 ) {
-    // Business Logic: Some players register themselves (Registered),
-    // others are added directly by captains (Unregistered).
-    val isRegistered = when (playerName) {
-        "Imran Ali", "Bilal Butt", "Usman Shinwari" -> false
-        else -> true
-    }
-
-    val battingStats = if (isRegistered) {
+    val battingStats = if (stats != null) {
         listOf(
-            Pair("Runs", "1,245"),
-            Pair("Average", "28.5"),
-            Pair("High Score", "84*")
+            Pair("Runs", stats.runs.toString()),
+            Pair("Average", String.format("%.1f", stats.batting_average ?: 0.0)),
+            Pair("Strike Rate", String.format("%.1f", stats.strike_rate ?: 0.0))
         )
     } else {
         listOf(
             Pair("Runs", "0"),
             Pair("Average", "0.0"),
-            Pair("High Score", "0")
+            Pair("Strike Rate", "0.0")
         )
     }
 
-    val bowlingStats = if (isRegistered) {
+    val bowlingStats = if (stats != null) {
         listOf(
-            Pair("Wickets", "48"),
-            Pair("Average", "24.2"),
-            Pair("Best Bowling", "4/18")
+            Pair("Wickets", stats.wickets.toString()),
+            Pair("Average", String.format("%.1f", stats.bowling_average ?: 0.0)),
+            Pair("Best Bowling", stats.best_bowling ?: "-")
         )
     } else {
         listOf(
             Pair("Wickets", "0"),
             Pair("Average", "0.0"),
-            Pair("Best Bowling", "0")
+            Pair("Best Bowling", "-")
         )
     }
 
-    val fieldingStats = if (isRegistered) {
+    val fieldingStats = if (stats != null) {
         listOf(
-            Pair("Catches", "14"),
-            Pair("Stumpings", "0"),
-            Pair("Runouts", "3")
+            Pair("Catches", (stats.catches ?: 0).toString()),
+            Pair("Stumpings", (stats.stumpings ?: 0).toString()),
+            Pair("Matches", stats.matches.toString())
         )
     } else {
         listOf(
             Pair("Catches", "0"),
             Pair("Stumpings", "0"),
-            Pair("Runouts", "0")
+            Pair("Matches", "0")
         )
     }
 
@@ -101,7 +98,7 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
             )
         }
 
-        // Player Name & Registration Status Badge
+        // Player Name & Registration Status
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -113,23 +110,21 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
                 color = MaterialTheme.colorScheme.onBackground,
                 fontFamily = FontFamily.SansSerif
             )
-            
             Text(
-                text = if (isRegistered) "Registered Player" else "Unregistered Player",
+                text = "Career Profile",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = FontFamily.SansSerif,
-                color = if (isRegistered) Color(0xFF2E7D32) else Color(0xFFD32F2F)
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
-        // Action Row: Profile ID pill, Follow Button, Share Icon Button
+        // Profile ID pill + Follow + Share
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Profile ID pill
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(99.dp))
@@ -139,7 +134,7 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Profile ID: ••••••",
+                    text = "Profile ID: $playerId",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.SansSerif,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
@@ -148,33 +143,26 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Follow button
             Button(
-                onClick = { /* Follow click action */ },
+                onClick = { },
                 shape = RoundedCornerShape(99.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
                 modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 32.dp)
             ) {
-                Text(
-                    text = "Follow",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.SansSerif
-                )
+                Text(text = "Follow", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.SansSerif)
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Share icon circle
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
                     .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f), CircleShape)
-                    .clickable { /* Share action */ },
+                    .clickable { },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -188,10 +176,22 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Determine if light theme is active by checking the background color
+        // Summary Row: Total Matches, Fifties, Hundreds
+        if (stats != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SummaryPill("Matches", stats.matches.toString(), Modifier.weight(1f))
+                SummaryPill("50s", (stats.fifties ?: 0).toString(), Modifier.weight(1f))
+                SummaryPill("100s", (stats.hundreds ?: 0).toString(), Modifier.weight(1f))
+                SummaryPill("Economy", String.format("%.2f", stats.economy ?: 0.0), Modifier.weight(1f))
+            }
+        }
+
         val isLightTheme = MaterialTheme.colorScheme.background != Color(0xFF121212)
 
-        // Three Vertical Stat Columns (Batting, Bowling, Fielding)
+        // Three Vertical Stat Columns
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -230,6 +230,34 @@ fun PlayerOverviewTab(playerName: String = "Ahmed Ali",
 }
 
 @Composable
+private fun SummaryPill(label: String, value: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.SansSerif
+            )
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.SansSerif
+            )
+        }
+    }
+}
+
+@Composable
 fun StatColumn(
     title: String,
     headerColor: Color,
@@ -251,7 +279,6 @@ fun StatColumn(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Header Title
             Text(
                 text = title,
                 color = headerColor,
@@ -260,7 +287,6 @@ fun StatColumn(
                 fontFamily = FontFamily.SansSerif
             )
 
-            // Values
             stats.forEach { (label, value) ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,

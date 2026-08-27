@@ -1,5 +1,6 @@
 package com.devwithguru.cricket.ui.feature.tournament
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,341 +20,344 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.devwithguru.cricket.domain.model.Tournament
-import android.widget.Toast
-import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTournamentScreen(
-    onCreateTournamentSuccess: (name: String, city: String, season: String, startDate: String, endDate: String, ballType: String) -> Unit,
+    onCreateTournamentSuccess: (tournamentId: String, name: String, hasDraft: Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: TournamentViewModel = hiltViewModel()
 ) {
     var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var organizerName by remember { mutableStateOf("") }
+    var contactInfo by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
+    var venue by remember { mutableStateOf("") }
     var season by remember { mutableStateOf("2026") }
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
-    var ballType by remember { mutableStateOf("Tennis") }
+    var ballType by remember { mutableStateOf("Tennis Ball") }
+    var competitionStructure by remember { mutableStateOf("League") }
+    var visibility by remember { mutableStateOf("public") }
+    var hasDraft by remember { mutableStateOf(false) }
+    var squadSize by remember { mutableStateOf("11") }
+    var pickDuration by remember { mutableStateOf("60") }
+    var oversPerInnings by remember { mutableStateOf("20") }
 
+    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val createdId by viewModel.createdTournamentId.collectAsState()
+    val createError by viewModel.createError.collectAsState()
+
+    // Navigate when tournament is created on server
+    LaunchedEffect(createdId) {
+        createdId?.let {
+            isLoading = false
+            val localTournament = com.devwithguru.cricket.domain.model.Tournament(
+                id = it, name = name, description = description,
+                organizerName = organizerName, contactInfo = contactInfo,
+                city = city, venue = venue, season = season,
+                startDate = startDate, endDate = endDate,
+                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20,
+                competitionStructure = competitionStructure, visibility = visibility,
+                hasDraft = hasDraft, squadSize = squadSize.toIntOrNull() ?: 11,
+                pickDuration = pickDuration.toIntOrNull() ?: 60, status = "upcoming"
+            )
+            viewModel.saveTournament(localTournament)
+            onCreateTournamentSuccess(it, name, hasDraft)
+            viewModel.clearError()
+        }
+    }
+    // Show error from API — fallback to local save
+    LaunchedEffect(createError) {
+        createError?.let {
+            val localId = viewModel.generateUniqueLocalId()
+            val localTournament = com.devwithguru.cricket.domain.model.Tournament(
+                id = localId, name = name, description = description,
+                organizerName = organizerName, contactInfo = contactInfo,
+                city = city, venue = venue, season = season,
+                startDate = startDate, endDate = endDate,
+                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20,
+                competitionStructure = competitionStructure, visibility = visibility,
+                hasDraft = hasDraft, squadSize = squadSize.toIntOrNull() ?: 11,
+                pickDuration = pickDuration.toIntOrNull() ?: 60, status = "upcoming"
+            )
+            viewModel.saveTournament(localTournament)
+            isLoading = false
+            onCreateTournamentSuccess(localId, name, hasDraft)
+            viewModel.clearError()
+        }
+    }
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+    fun showDatePicker(onDateSelected: (String) -> Unit) {
+        val calendar = Calendar.getInstance()
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val cal = Calendar.getInstance()
+                cal.set(year, month, dayOfMonth)
+                onDateSelected(dateFormat.format(cal.time))
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "CREATE TOURNAMENT",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 1.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = { Text("Create Tournament", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) } },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
                 .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Background Radial Gradient for Premium Look
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                                Color.Transparent
-                            ),
-                            radius = 1000f
-                        )
-                    )
+            // Description
+            Text(
+                text = "Set up your tournament with schedule, format, and optional draft.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Launch a structured tournament with points tables, fixtures scheduling, and a transactional draft pool.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 24.dp)
+            // Error
+            if (errorMessage != null) {
+                Text(errorMessage!!, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), textAlign = TextAlign.Center)
+            }
+
+            // ── Basic Information ──
+            SectionCard(title = "Basic Information") {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it; errorMessage = null },
+                    placeholder = { Text("e.g., Premier Cricket Cup", fontSize = 13.sp) },
+                    label = { Text("Tournament Name", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
                 )
+                OutlinedTextField(
+                    value = city, onValueChange = { city = it; errorMessage = null },
+                    placeholder = { Text("e.g., Lahore", fontSize = 13.sp) },
+                    label = { Text("City", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.LocationCity, null, modifier = Modifier.size(16.dp)) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                )
+                OutlinedTextField(
+                    value = venue, onValueChange = { venue = it },
+                    placeholder = { Text("e.g., Gaddafi Stadium", fontSize = 13.sp) },
+                    label = { Text("Venue (optional)", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                )
+                OutlinedTextField(
+                    value = season, onValueChange = { season = it },
+                    placeholder = { Text("e.g., 2026", fontSize = 13.sp) },
+                    label = { Text("Season", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                )
+            }
 
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage!!,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                // --- Tournament Details Section ---
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Basic Information",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // Tournament Name
+            // ── Schedule (Date Picker Fix) ──
+            SectionCard(title = "Schedule") {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Start Date — Box wrapper with clickable overlay
+                    Box(modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
-                            value = name,
-                            onValueChange = { 
-                                name = it
-                                errorMessage = null 
-                            },
-                            placeholder = { Text("e.g., Premier Cricket Cup", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-                            label = { Text("Tournament Name", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
+                            value = if (startDate.isNotEmpty()) startDate else "",
+                            onValueChange = {},
+                            placeholder = { Text("Select date", fontSize = 12.sp) },
+                            label = { Text("Start Date", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(14.dp)) },
+                            readOnly = true,
+                            enabled = false,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                focusedContainerColor = MaterialTheme.colorScheme.background,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.background
-                            )
+                                disabledBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledLabelColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            ),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
                         )
-
-                        // City Location
-                        OutlinedTextField(
-                            value = city,
-                            onValueChange = { 
-                                city = it
-                                errorMessage = null 
-                            },
-                            placeholder = { Text("e.g., Lahore or Islamabad", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-                            label = { Text("City/Location", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
-                            leadingIcon = { Icon(Icons.Default.LocationCity, "City", modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                focusedContainerColor = MaterialTheme.colorScheme.background,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.background
-                            )
+                        // Transparent clickable overlay
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker { startDate = it } }
                         )
+                    }
 
-                        // Season name
+                    // End Date — Box wrapper with clickable overlay
+                    Box(modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
-                            value = season,
-                            onValueChange = { 
-                                season = it
-                                errorMessage = null 
-                            },
-                            placeholder = { Text("e.g., 2026", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-                            label = { Text("Season / Year", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
+                            value = if (endDate.isNotEmpty()) endDate else "",
+                            onValueChange = {},
+                            placeholder = { Text("Select date", fontSize = 12.sp) },
+                            label = { Text("End Date", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(14.dp)) },
+                            readOnly = true,
+                            enabled = false,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                focusedContainerColor = MaterialTheme.colorScheme.background,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.background
-                            )
+                                disabledBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledLabelColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            ),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker { endDate = it } }
                         )
                     }
                 }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // --- Dates & Duration Section ---
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Schedule & Ball Type",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // Dates Input Fields
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = startDate,
-                                onValueChange = { startDate = it },
-                                placeholder = { Text("YYYY-MM-DD", fontSize = 13.sp) },
-                                label = { Text("Start Date", fontSize = 12.sp) },
-                                leadingIcon = { Icon(Icons.Default.CalendarToday, "Calendar", modifier = Modifier.size(18.dp)) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                    focusedContainerColor = MaterialTheme.colorScheme.background,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.background
-                                )
-                            )
-
-                            OutlinedTextField(
-                                value = endDate,
-                                onValueChange = { endDate = it },
-                                placeholder = { Text("YYYY-MM-DD", fontSize = 13.sp) },
-                                label = { Text("End Date", fontSize = 12.sp) },
-                                leadingIcon = { Icon(Icons.Default.CalendarToday, "Calendar", modifier = Modifier.size(18.dp)) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                    focusedContainerColor = MaterialTheme.colorScheme.background,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.background
-                                )
-                            )
-                        }
-
-                        // Ball Type Segmented Control
-                        Column {
-                            Text(
-                                text = "Ball Type",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                listOf("Tennis", "Leather").forEach { type ->
-                                    val isSelected = ballType == type
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(48.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background)
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                                RoundedCornerShape(12.dp)
-                                            )
-                                            .clickable { ballType = type },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = type,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(40.dp))
-
-                // Action Button
-                Button(
-                    onClick = {
-                        when {
-                            name.isBlank() -> errorMessage = "Please enter tournament name"
-                            city.isBlank() -> errorMessage = "Please enter city"
-                            season.isBlank() -> errorMessage = "Please enter season year/name"
-                            startDate.isBlank() -> errorMessage = "Please specify start date"
-                            endDate.isBlank() -> errorMessage = "Please specify end date"
-                            else -> {
-                                val id = "t_${System.currentTimeMillis()}"
-                                val tournament = Tournament(
-                                    id = id,
-                                    name = name,
-                                    city = city,
-                                    season = season,
-                                    startDate = startDate,
-                                    endDate = endDate,
-                                    ballType = ballType
-                                )
-                                viewModel.saveTournament(tournament)
-                                onCreateTournamentSuccess(name, city, season, startDate, endDate, ballType)
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+            // ── Game Format ──
+            SectionCard(title = "Game Format") {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = oversPerInnings, onValueChange = { oversPerInnings = it.filter { c -> c.isDigit() } },
+                        label = { Text("Overs per Innings", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp), singleLine = true,
+                        colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
                     )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "CREATE & SETUP DRAFT",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                    OutlinedTextField(
+                        value = squadSize, onValueChange = { squadSize = it.filter { c -> c.isDigit() } },
+                        label = { Text("Players per Team", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp), singleLine = true,
+                        colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── Draft Settings ──
+            SectionCard(title = "Draft Settings") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Enable Draft", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Captains pick players in a snake draft", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                    }
+                    Switch(checked = hasDraft, onCheckedChange = { hasDraft = it }, colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary))
+                }
+
+                if (hasDraft) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = pickDuration, onValueChange = { pickDuration = it.filter { c -> c.isDigit() } },
+                        label = { Text("Pick Duration (seconds)", fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                        colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Create Button ──
+            Button(
+                onClick = {
+                    val pCount = squadSize.toIntOrNull() ?: 11
+                    when {
+                        name.isBlank() -> errorMessage = "Please enter tournament name"
+                        city.isBlank() -> errorMessage = "Please enter city"
+                        pCount < 2 -> errorMessage = "Players per Team must be at least 2"
+                        else -> {
+                            isLoading = true
+                            errorMessage = null
+                            viewModel.createTournamentViaApi(
+                                name = name, description = description,
+                                organizerName = organizerName, contactInfo = contactInfo,
+                                city = city, venue = venue, season = season,
+                                startDate = startDate, endDate = endDate,
+                                ballType = ballType, competitionStructure = competitionStructure,
+                                visibility = visibility,
+                                hasDraft = hasDraft, squadSize = pCount,
+                                pickDuration = pickDuration.toIntOrNull() ?: 60,
+                                overs = oversPerInnings.toIntOrNull() ?: 20
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.EmojiEvents, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("CREATE TOURNAMENT", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
+
+@Composable
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun defaultFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+    focusedContainerColor = MaterialTheme.colorScheme.background,
+    unfocusedContainerColor = MaterialTheme.colorScheme.background
+)

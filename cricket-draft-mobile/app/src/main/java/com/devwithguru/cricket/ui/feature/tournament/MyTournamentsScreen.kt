@@ -32,7 +32,7 @@ import com.devwithguru.cricket.domain.model.Tournament
 @Composable
 fun MyTournamentsScreen(
     onNavigateToCreateTournament: () -> Unit,
-    onNavigateToTournamentHub: (id: String) -> Unit,
+    onNavigateToTournament: (id: String, status: String, hasDraft: Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: TournamentViewModel = hiltViewModel()
 ) {
@@ -46,13 +46,24 @@ fun MyTournamentsScreen(
         val matchesSearch = tournament.name.contains(searchQuery, ignoreCase = true) ||
                             tournament.city.contains(searchQuery, ignoreCase = true)
         val matchesFilter = when (selectedFilterTab) {
-            "Active" -> tournament.status == "Active"
-            "Upcoming" -> tournament.status == "Upcoming"
-            "Completed" -> tournament.status == "Completed"
+            "Active" -> tournament.status.equals("active", ignoreCase = true) || tournament.status.equals("live", ignoreCase = true)
+            "Upcoming" -> tournament.status.equals("upcoming", ignoreCase = true) || tournament.status.equals("draft", ignoreCase = true) || tournament.status.equals("scheduled", ignoreCase = true)
+            "Completed" -> tournament.status.equals("completed", ignoreCase = true)
             else -> true
         }
         matchesSearch && matchesFilter
     }
+
+    val sortedTournaments = filteredTournaments.sortedWith(
+        compareBy<Tournament> {
+            when (it.status.lowercase()) {
+                "active", "live" -> 0
+                "upcoming", "draft", "scheduled" -> 1
+                "completed" -> 2
+                else -> 3
+            }
+        }.thenByDescending { it.startDate }
+    )
 
 
     Scaffold(
@@ -175,7 +186,7 @@ fun MyTournamentsScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Scrollable List
-                if (filteredTournaments.isEmpty()) {
+                if (sortedTournaments.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -195,10 +206,10 @@ fun MyTournamentsScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(bottom = 80.dp) // Avoid overlap with FAB
                     ) {
-                        items(filteredTournaments) { item ->
+                        items(sortedTournaments) { item ->
                             TournamentCard(
                                 tournament = item,
-                                onClick = { onNavigateToTournamentHub(item.id) }
+                                onClick = { onNavigateToTournament(item.id, item.status, item.hasDraft) }
                             )
                         }
                     }
@@ -216,9 +227,9 @@ fun TournamentCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -244,87 +255,103 @@ fun TournamentCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Details Grid
-            Row(
+            // Details List (Stacked Vertically for Perfect Left-Alignment)
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Location & Ball Type
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "Location",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = tournament.city,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SportsCricket,
-                            contentDescription = "Ball Type",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = tournament.ballType,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp
-                        )
-                    }
+                // 1. Location Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = tournament.city,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
                 }
 
-                // Dates & Teams Registered
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                // 2. Dates Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Dates",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "${tournament.startDate} - ${tournament.endDate}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = "Dates",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "${tournament.startDate}  to  ${tournament.endDate}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = "Teams Registered",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "${tournament.teamCount} Teams",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                // 3. Ball Type Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SportsCricket,
+                        contentDescription = "Ball Type",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = tournament.ballType,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Row 3: Registered Teams count summary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = "Teams",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Registered Teams",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = "${tournament.teamCount} Teams",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -333,11 +360,11 @@ fun TournamentCard(
 
 @Composable
 fun StatusBadge(status: String) {
-    val (backgroundColor, textColor, text) = when (status) {
-        "LIVE" -> Triple(Color(0xFFEF4444).copy(alpha = 0.15f), Color(0xFFEF4444), "LIVE")
-        "UPCOMING" -> Triple(Color(0xFF94A3B8).copy(alpha = 0.15f), Color(0xFF94A3B8), "UPCOMING")
-        "COMPLETED" -> Triple(Color(0xFF22C55E).copy(alpha = 0.15f), Color(0xFF22C55E), "COMPLETED")
-        else -> Triple(Color.Gray.copy(alpha = 0.15f), Color.Gray, status)
+    val (backgroundColor, textColor, text) = when (status.lowercase()) {
+        "live", "active" -> Triple(Color(0xFFEF4444).copy(alpha = 0.15f), Color(0xFFEF4444), "ACTIVE")
+        "upcoming", "draft", "scheduled" -> Triple(Color(0xFF2196F3).copy(alpha = 0.15f), Color(0xFF2196F3), "UPCOMING")
+        "completed" -> Triple(Color(0xFF22C55E).copy(alpha = 0.15f), Color(0xFF22C55E), "COMPLETED")
+        else -> Triple(Color.Gray.copy(alpha = 0.15f), Color.Gray, status.uppercase())
     }
 
     Box(

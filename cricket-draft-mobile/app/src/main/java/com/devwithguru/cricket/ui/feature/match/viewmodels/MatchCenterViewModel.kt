@@ -57,7 +57,7 @@ class MatchCenterViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 // Fallback to Room only
-                val roomFixture = fixtureRepository.getFixtureById(matchId)
+                val roomFixture = fixtureRepository.getScheduledFixtureById(matchId)
                 _fixture.value = roomFixture
                 if (roomFixture != null) {
                     _isLive.value = roomFixture.status == "Live"
@@ -137,7 +137,7 @@ class MatchCenterViewModel @Inject constructor(
     fun updateFixtureStatus(matchId: String, status: String) {
         viewModelScope.launch {
             fixtureRepository.updateStatus(matchId, status)
-            val updated = fixtureRepository.getFixtureById(matchId)
+            val updated = fixtureRepository.getScheduledFixtureById(matchId)
             _fixture.value = updated
             _isLive.value = status == "Live"
         }

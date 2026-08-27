@@ -32,12 +32,6 @@ fun PlayerOnboardingScreen(
 ) {
     val onboardingState by viewModel.uiState.collectAsState()
 
-    // Navigate on successful profile update
-    LaunchedEffect(onboardingState.isCompleted) {
-        if (onboardingState.isCompleted) {
-            onSubmitRegistration(fullName, primaryRole, battingStyle, bowlingStyle, city, biography)
-        }
-    }
     var fullName by remember { mutableStateOf("") }
     var contactNumber by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
@@ -47,6 +41,14 @@ fun PlayerOnboardingScreen(
     var biography by remember { mutableStateOf("") }
 
     var isRoleDropdownExpanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Navigate on successful profile update
+    LaunchedEffect(onboardingState.isCompleted) {
+        if (onboardingState.isCompleted) {
+            onSubmitRegistration(fullName, primaryRole, battingStyle, bowlingStyle, city, biography)
+        }
+    }
 
     val rolesList = listOf("Batter", "Bowler", "All-Rounder", "Wicketkeeper")
     val bowlingStyles = listOf("Fast", "Medium", "Spin", "None")
@@ -99,6 +101,15 @@ fun PlayerOnboardingScreen(
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
             if (onboardingState.error != null) {
                 Text(
                     text = onboardingState.error!!,
@@ -356,6 +367,7 @@ fun PlayerOnboardingScreen(
                         errorMessage = "Please fill in all details (Name, Contact, City, Role)"
                         return@Button
                     }
+                    errorMessage = null
                     viewModel.submitProfile(fullName, primaryRole, battingStyle, bowlingStyle, city, biography)
                 },
                 modifier = Modifier
