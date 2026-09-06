@@ -6,7 +6,6 @@ use App\Models\CricketMatch;
 use App\Models\PlayerProfile;
 use App\Models\Team;
 use App\Models\Tournament;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class UnifiedSearchService
 {

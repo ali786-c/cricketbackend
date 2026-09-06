@@ -37,27 +37,16 @@ class SearchController extends Controller
             ? array_map('trim', explode(',', $validated['type']))
             : ['players', 'teams', 'tournaments', 'matches'];
 
-        try {
-            $results = $searchService->search($validated['q'], [
-                'types' => $types,
-                'limit' => $validated['limit'] ?? 10,
-                'city' => $validated['city'] ?? null,
-                'playing_role' => $validated['playing_role'] ?? null,
-                'tournament_id' => $validated['tournament_id'] ?? null,
-                'status' => $validated['status'] ?? null,
-            ]);
-            return response()->json(['data' => $results]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'data' => [
-                    'players' => [],
-                    'teams' => [],
-                    'tournaments' => [],
-                    'matches' => [],
-                    'meta' => ['query' => $validated['q'], 'error' => $e->getMessage()],
-                ],
-            ]);
-        }
+        $results = $searchService->search($validated['q'], [
+            'types' => $types,
+            'limit' => $validated['limit'] ?? 10,
+            'city' => $validated['city'] ?? null,
+            'playing_role' => $validated['playing_role'] ?? null,
+            'tournament_id' => $validated['tournament_id'] ?? null,
+            'status' => $validated['status'] ?? null,
+        ]);
+
+        return response()->json(['data' => $results]);
     }
 
     /**
