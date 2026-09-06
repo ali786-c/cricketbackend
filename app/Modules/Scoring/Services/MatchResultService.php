@@ -21,20 +21,41 @@ class MatchResultService
             $match = CricketMatch::query()->with(['innings.battingTeam', 'innings.bowlingTeam', 'ruleProfile'])->lockForUpdate()->findOrFail($match->id);
             if ($match->status !== 'completed') $this->fail('match', 'Only a completed match can be submitted for result approval.');
             $innings = $match->innings->sortBy('innings_number')->values();
-            if ($innings->count() < ((int) $match->ruleProfile->innings_per_side * 2)) $this->fail('match', 'Both teams’ configured innings must be completed first.');
-            $first = $innings->first();
-            $second = $innings->get(1);
+            $expectedInnings = (int) $match->ruleProfile->innings_per_side * 2;
+            if ($innings->count() < $expectedInnings) $this->fail('match', 'Both teams\' configured innings must be completed first.');
+
+            // Group innings by batting team and aggregate runs.
+            $teamTotals = $innings->groupBy('batting_team_id')->map(function ($teamInnings, $teamId) {
+                return [
+                    'team_id' => (int) $teamId,
+                    'total_runs' => $teamInnings->sum('total_runs'),
+                    'total_wickets' => $teamInnings->sum('wickets'),
+                    'last_innings' => $teamInnings->last(),
+                ];
+            })->values();
+
             $resultType = 'tie';
             $winner = null;
             $summary = 'Match tied';
-            if ($second && $second->total_runs >= (int) $first->total_runs + 1) {
-                $winner = $second->batting_team_id;
-                $resultType = 'win';
-                $summary = $second->battingTeam?->short_name.' won by '.max(0, (int) ($match->ruleProfile->maximum_wickets - $second->wickets)).' wickets';
-            } elseif ($second && $first->total_runs > $second->total_runs) {
-                $winner = $first->batting_team_id;
-                $resultType = 'win';
-                $summary = $first->battingTeam?->short_name.' won by '.((int) $first->total_runs - (int) $second->total_runs).' runs';
+
+            if ($teamTotals->count() === 2) {
+                $teamA = $teamTotals[0];
+                $teamB = $teamTotals[1];
+
+                if ($teamA['total_runs'] > $teamB['total_runs']) {
+                    $winner = $teamA['team_id'];
+                    $resultType = 'win';
+                    $margin = $teamA['total_runs'] - $teamB['total_runs'];
+                    // Determine winner's team name from the last innings they batted
+                    $winnerTeam = $teamA['last_innings']->battingTeam;
+                    $summary = $winnerTeam?->short_name.' won by '.$margin.' runs';
+                } elseif ($teamB['total_runs'] > $teamA['total_runs']) {
+                    $winner = $teamB['team_id'];
+                    $resultType = 'win';
+                    $winnerTeam = $teamB['last_innings']->battingTeam;
+                    $wicketsRemaining = max(0, (int) $match->ruleProfile->maximum_wickets - (int) $teamB['total_wickets']);
+                    $summary = $winnerTeam?->short_name.' won by '.$wicketsRemaining.' wickets';
+                }
             }
             $match->update(['winner_team_id' => $winner, 'result_type' => $resultType, 'result_summary' => $summary, 'result_submitted_at' => now(), 'result_submitted_by' => $actorId, 'status' => 'result_pending', 'revision' => $match->revision + 1, 'last_event_at' => now(), 'updated_by' => $actorId]);
             return $match->fresh(['winner', 'innings']);

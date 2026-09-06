@@ -18,9 +18,10 @@ class MatchScoringController extends Controller
     public function show(CricketMatch $match): View
     {
         abort_unless($match->status === 'live', 409, 'Scoring is only available for a live match.');
-        $match->load(['ruleProfile', 'players.team', 'innings.battingTeam', 'innings.bowlingTeam', 'innings.deliveries.striker', 'innings.deliveries.nonStriker', 'innings.deliveries.bowler', 'innings.deliveries.wicket']);
+        $match->load(['tournament', 'ruleProfile', 'players.team', 'innings.battingTeam', 'innings.bowlingTeam', 'innings.deliveries.striker', 'innings.deliveries.nonStriker', 'innings.deliveries.bowler', 'innings.deliveries.wicket']);
         $innings = $match->innings->firstWhere('id', $match->current_innings_id);
         return view('admin.matches.scorer', [
+            'tournament' => $match->tournament,
             'match' => $match,
             'innings' => $innings,
             'batters' => $match->players->where('team_id', $innings?->batting_team_id)->where('selection_type', 'playing_xi'),

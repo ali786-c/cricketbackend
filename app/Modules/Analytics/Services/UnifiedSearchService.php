@@ -185,11 +185,13 @@ class UnifiedSearchService
     private function searchMatches(string $query, bool $isCode, int $limit, ?int $tournamentId): array
     {
         $q = CricketMatch::query()
-            ->with(['homeTeam', 'awayTeam', 'tournament']);
+            ->with(['fixture.homeTeam', 'fixture.awayTeam', 'tournament']);
 
         $q->where(function ($sub) use ($query) {
-            $sub->whereHas('homeTeam', fn($t) => $t->where('name', 'like', "%{$query}%")->orWhere('short_name', 'like', "%{$query}%"))
-                ->orWhereHas('awayTeam', fn($t) => $t->where('name', 'like', "%{$query}%")->orWhere('short_name', 'like', "%{$query}%"))
+            $sub->whereHas('fixture.homeTeam', fn($t) => $t->where('name', 'like', "%{$query}%")
+                    ->orWhere('short_name', 'like', "%{$query}%"))
+                ->orWhereHas('fixture.awayTeam', fn($t) => $t->where('name', 'like', "%{$query}%")
+                    ->orWhere('short_name', 'like', "%{$query}%"))
                 ->orWhereHas('tournament', fn($t) => $t->where('name', 'like', "%{$query}%"));
         });
 
@@ -202,9 +204,8 @@ class UnifiedSearchService
         return $results->map(fn($m) => [
             'id' => $m->id,
             'status' => $m->status,
-            'starts_on' => $m->starts_on,
-            'home_team' => $m->homeTeam?->short_name,
-            'away_team' => $m->awayTeam?->short_name,
+            'home_team' => $m->fixture?->homeTeam?->short_name,
+            'away_team' => $m->fixture?->awayTeam?->short_name,
             'tournament' => $m->tournament?->name,
             'tournament_id' => $m->tournament_id,
         ])->toArray();

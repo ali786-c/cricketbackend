@@ -98,6 +98,78 @@ class DraftSetupController extends Controller
             ->with('status', 'Draft rounds and pick assignments saved successfully.');
     }
 
+    /**
+     * API endpoint for draft setup — accepts JSON payload.
+     */
+    public function updateApi(\Illuminate\Http\Request $request, Tournament $tournament): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'rounds' => ['required', 'array', 'min:1'],
+            'rounds.*.round_number' => ['required', 'integer', 'min:1'],
+            'rounds.*.name' => ['nullable', 'string', 'max:100'],
+            'rounds.*.picks' => ['required', 'array', 'min:1'],
+            'rounds.*.picks.*.team_id' => ['required', 'integer', 'exists:teams,id'],
+            'rounds.*.picks.*.pick_number' => ['required', 'integer', 'min:1'],
+            'rounds.*.picks.*.pick_duration' => ['nullable', 'integer', 'min:5', 'max:3600'],
+        ]);
+
+        $teamIds = $tournament->teams()->pluck('id')->all();
+        $pickNumbers = [];
+        $defaultDuration = $tournament->default_pick_duration ?? 60;
+
+        foreach ($data['rounds'] as $round) {
+            foreach ($round['picks'] as $pick) {
+                if (! in_array((int) $pick['team_id'], $teamIds, true)) {
+                    return response()->json(['message' => 'Every team must belong to this tournament.'], 422);
+                }
+                if (in_array($pick['pick_number'], $pickNumbers, true)) {
+                    return response()->json(['message' => 'Pick numbers must be unique.'], 422);
+                }
+                $pickNumbers[] = $pick['pick_number'];
+            }
+        }
+
+        DB::transaction(function () use ($data, $tournament, $pickNumbers, $defaultDuration) {
+            $draft = Draft::query()->firstOrCreate(
+                ['tournament_id' => $tournament->id],
+                ['status' => 'setup']
+            );
+            $draft = Draft::query()->lockForUpdate()->findOrFail($draft->id);
+
+            if ($draft->status !== 'setup') {
+                return response()->json(['message' => 'Draft configuration cannot be changed after start.'], 422);
+            }
+
+            $draft->picks()->delete();
+            $draft->rounds()->delete();
+
+            foreach ($data['rounds'] as $roundPayload) {
+                $round = $draft->rounds()->create([
+                    'round_number' => $roundPayload['round_number'],
+                    'name' => $roundPayload['name'] ?? null,
+                    'status' => 'pending',
+                ]);
+
+                foreach ($roundPayload['picks'] as $pickPayload) {
+                    $round->picks()->create([
+                        'draft_id' => $draft->id,
+                        'team_id' => $pickPayload['team_id'],
+                        'pick_number' => $pickPayload['pick_number'],
+                        'pick_duration' => $pickPayload['pick_duration'] ?? $defaultDuration,
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+
+            $draft->update([
+                'current_pick_number' => min($pickNumbers),
+                'revision' => $draft->revision + 1,
+            ]);
+        });
+
+        return response()->json(['message' => 'Draft setup saved successfully.']);
+    }
+
     public function downloadSample(Tournament $tournament): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $teams = $tournament->teams;

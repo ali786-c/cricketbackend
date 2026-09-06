@@ -116,7 +116,7 @@ class PlayerProfileStatsService
         $last10MatchPlayers = MatchPlayer::query()
             ->whereIn('tournament_player_id', $tpIds)
             ->whereHas('match', fn($q) => $q->where('status', 'completed'))
-            ->with(['match', 'match.homeTeam', 'match.awayTeam'])
+            ->with(['match', 'match.fixture.homeTeam', 'match.fixture.awayTeam'])
             ->latest('id')
             ->take(10)
             ->get();
@@ -127,11 +127,14 @@ class PlayerProfileStatsService
             $balls = $batting?->balls ?? 0;
             $sr = $balls > 0 ? round(($runs / $balls) * 100, 2) : 0.0;
 
-            // Opponent name
+            // Opponent name — resolve through fixture
             $match = $mp->match;
             $opponent = 'Opponent';
-            if ($match) {
-                $opponent = $mp->team_id === $match->home_team_id ? ($match->awayTeam?->short_name ?? 'Opponent') : ($match->homeTeam?->short_name ?? 'Opponent');
+            if ($match && $match->fixture) {
+                $homeTeamId = $match->fixture->home_team_id;
+                $opponent = $mp->team_id === $homeTeamId
+                    ? ($match->fixture->awayTeam?->short_name ?? 'Opponent')
+                    : ($match->fixture->homeTeam?->short_name ?? 'Opponent');
             }
 
             return [

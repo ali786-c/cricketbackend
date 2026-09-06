@@ -55,8 +55,8 @@ class AdminDraftController extends Controller
 
     public function selectPlayer(Request $request, Tournament $tournament): JsonResponse
     {
-        $data = $request->validate(['pick_number' => ['required', 'integer', 'min:1'], 'player_id' => ['required', 'integer']]);
-        $player = TournamentPlayer::query()->findOrFail($data['player_id']);
+        $data = $request->validate(['pick_number' => ['required', 'integer', 'min:1'], 'tournament_player_id' => ['required', 'integer']]);
+        $player = TournamentPlayer::query()->where('tournament_id', $tournament->id)->findOrFail($data['tournament_player_id']);
         return $this->draftResponse($tournament, $this->drafts->adminSelectPlayer($this->draft($tournament), $request->user(), (int) $data['pick_number'], $player), 'Player selected manually.');
     }
 

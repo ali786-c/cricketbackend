@@ -11,7 +11,7 @@
 }">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div><p class="cricket-kicker mb-1">Live scorer</p><h1 class="h2 fw-bold mb-1">Match #{{ $match->id }}</h1><p class="text-secondary mb-0">{{ $innings?->battingTeam?->name }} batting · {{ $innings?->bowlingTeam?->name }} bowling · {{ $match->ruleProfile?->name }}</p></div>
-        <a href="{{ url()->previous() }}" class="btn btn-outline-primary">Back to match</a>
+        <a href="{{ route('admin.tournaments.matches.show', [$tournament, $match]) }}" class="btn btn-outline-primary">Back to match</a>
     </div>
     @if(session('status'))<div class="alert alert-success">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

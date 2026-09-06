@@ -24,7 +24,7 @@ class TournamentController extends Controller
     public function teams(Tournament $tournament): JsonResponse
     {
         $this->ensurePublic($tournament);
-        return response()->json(['data' => $tournament->teams()->where('is_active', true)->withCount(['matchPlayers'])->orderBy('display_order')->get()->map(fn ($team) => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_path' => $team->logo_path, 'squad_count' => $team->match_players_count])->values()]);
+        return response()->json(['data' => $tournament->teams()->where('is_active', true)->withCount(['matchPlayers'])->orderBy('display_order')->get()->map(fn ($team) => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_path' => $team->logo_path, 'squad_count' => $team->match_players_count, 'creator_id' => $team->creator_id])->values()]);
     }
 
     public function players(Tournament $tournament): JsonResponse
@@ -53,8 +53,8 @@ class TournamentController extends Controller
             'venue' => $fixture->venue,
             'city' => $fixture->city,
             'status' => $fixture->status,
-            'home_team' => ['id' => $fixture->homeTeam->id, 'name' => $fixture->homeTeam->name, 'short_name' => $fixture->homeTeam->short_name],
-            'away_team' => ['id' => $fixture->awayTeam->id, 'name' => $fixture->awayTeam->name, 'short_name' => $fixture->awayTeam->short_name],
+            'home_team' => $fixture->homeTeam ? ['id' => $fixture->homeTeam->id, 'name' => $fixture->homeTeam->name, 'short_name' => $fixture->homeTeam->short_name] : null,
+            'away_team' => $fixture->awayTeam ? ['id' => $fixture->awayTeam->id, 'name' => $fixture->awayTeam->name, 'short_name' => $fixture->awayTeam->short_name] : null,
             'match_id' => $fixture->match?->id,
             'match_status' => $fixture->match?->status,
         ])->values()]);

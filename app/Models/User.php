@@ -50,6 +50,16 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class);
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            $user->playerProfile()->create([
+                'full_name' => $user->name,
+                'is_active' => true,
+            ]);
+        });
+    }
+
     protected function casts(): array
     {
         return [

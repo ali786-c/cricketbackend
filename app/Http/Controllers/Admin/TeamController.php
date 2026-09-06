@@ -44,7 +44,10 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request, Tournament $tournament): RedirectResponse
     {
-        $tournament->teams()->create($request->validated());
+        $tournament->teams()->create(array_merge(
+            $request->validated(),
+            ['creator_id' => $request->user()?->id]
+        ));
 
         return back()->with('status', 'Team added successfully.');
     }

@@ -38,6 +38,10 @@ class Tournament extends Model
         'published_at',
         'ball_type',
         'data_source',
+        'organizer_name',
+        'contact_info',
+        'competition_structure',
+        'tournament_code',
     ];
 
     protected function casts(): array
@@ -125,5 +129,10 @@ class Tournament extends Model
     public function standings(): HasMany
     {
         return $this->hasMany(TournamentStanding::class);
+    }
+
+    public function stages(): HasMany
+    {
+        return $this->hasMany(Stage::class)->orderBy('order');
     }
 }

@@ -52,6 +52,16 @@ class AdminFixtureController extends Controller
         return $request->validate(['home_team_id' => ['required', 'integer'], 'away_team_id' => ['required', 'integer', 'different:home_team_id'], 'round_number' => ['nullable', 'integer', 'min:1', 'max:999'], 'round_name' => ['nullable', 'string', 'max:100'], 'match_number' => ['nullable', 'integer', 'min:1', 'max:9999'], 'scheduled_at' => ['required', 'date'], 'venue' => ['nullable', 'string', 'max:255'], 'city' => ['nullable', 'string', 'max:100'], 'timezone' => ['required', 'timezone'], 'notes' => ['nullable', 'string', 'max:2000']]);
     }
 
+    /**
+     * Delete a fixture.
+     */
+    public function destroy(Tournament $tournament, Fixture $fixture): JsonResponse
+    {
+        $this->belongs($tournament, $fixture);
+        $fixture->delete();
+        return response()->json(['message' => 'Fixture deleted successfully.']);
+    }
+
     private function belongs(Tournament $tournament, Fixture $fixture): void
     {
         abort_unless($fixture->tournament_id === $tournament->id, 404);

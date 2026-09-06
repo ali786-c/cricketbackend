@@ -60,20 +60,22 @@ class ProfileController extends Controller
     {
         $matches = \App\Models\MatchPlayer::query()
             ->where('player_profile_id', $playerProfile->id)
-            ->with(['match.tournament', 'match.fixture'])
+            ->with(['match.tournament', 'match.fixture.homeTeam', 'match.fixture.awayTeam', 'inningsBattingStats', 'inningsBowlingStats'])
             ->latest()
             ->get()
             ->map(fn ($mp) => [
                 'id' => $mp->match?->id,
                 'tournament_name' => $mp->match->tournament?->name,
-                'opponent' => $mp->team_id === $mp->match?->home_team_id
-                    ? $mp->match->awayTeam?->name
-                    : $mp->match->homeTeam?->name,
+                'opponent' => $mp->match->fixture
+                    ? ($mp->team_id === $mp->match->fixture->home_team_id
+                        ? $mp->match->fixture->awayTeam?->name
+                        : $mp->match->fixture->homeTeam?->name)
+                    : 'TBD',
                 'venue' => $mp->match->fixture?->venue,
                 'date' => $mp->match->fixture?->scheduled_at?->toDateString(),
-                'runs' => $mp->batting_runs,
-                'wickets' => $mp->bowling_wickets,
-                'overs_bowled' => $mp->bowling_overs,
+                'runs' => $mp->inningsBattingStats->sum('runs'),
+                'wickets' => $mp->inningsBowlingStats->sum('wickets'),
+                'overs_bowled' => \round($mp->inningsBowlingStats->sum('legal_balls') / 6, 1),
                 'result' => $mp->match->result_summary,
                 'match_type' => $mp->match->tournament->cricketRuleProfile?->format,
             ]);

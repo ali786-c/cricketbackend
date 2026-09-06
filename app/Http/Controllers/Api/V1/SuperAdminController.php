@@ -184,7 +184,7 @@ class SuperAdminController extends Controller
     public function tournament(Request $request, Tournament $tournament): JsonResponse
     {
         $this->ensureSuperAdmin($request);
-        $tournament->loadCount(['teams', 'tournamentPlayers', 'matches', 'fixtures', 'auditLogs'])->load(['teams.captain.user', 'matches.homeTeam', 'matches.awayTeam', 'fixtures.homeTeam', 'fixtures.awayTeam']);
+        $tournament->loadCount(['teams', 'tournamentPlayers', 'matches', 'fixtures', 'auditLogs'])->load(['teams.captain.user', 'matches.fixture.homeTeam', 'matches.fixture.awayTeam', 'fixtures.homeTeam', 'fixtures.awayTeam']);
         return response()->json(['data' => $tournament]);
     }
 

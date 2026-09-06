@@ -26,6 +26,10 @@ class AdminTournamentController extends Controller
         $data['has_draft'] = $request->boolean('has_draft', false);
         $data['ball_type'] = $request->input('ball_type', 'leather');
         $data['data_source'] = $request->input('data_source', 'verified');
+        $data['organizer_name'] = $request->input('organizer_name');
+        $data['contact_info'] = $request->input('contact_info');
+        $data['competition_structure'] = $request->input('competition_structure', 'League');
+        $data['tournament_code'] = $request->input('tournament_code');
         $data['logo_path'] = $request->hasFile('logo') ? $request->file('logo')->store('tournaments', 'public') : null;
         $data['banner_path'] = $request->hasFile('banner') ? $request->file('banner')->store('tournaments', 'public') : null;
         $tournament = Tournament::create(array_merge($data, ['status' => 'draft']));
@@ -64,6 +68,11 @@ class AdminTournamentController extends Controller
             if ($tournament->banner_path) Storage::disk('public')->delete($tournament->banner_path);
             $data['banner_path'] = $request->file('banner')->store('tournaments', 'public');
         }
+        $data['organizer_name'] = $request->input('organizer_name', $tournament->organizer_name);
+        $data['contact_info'] = $request->input('contact_info', $tournament->contact_info);
+        $data['competition_structure'] = $request->input('competition_structure', $tournament->competition_structure);
+        $data['tournament_code'] = $request->input('tournament_code', $tournament->tournament_code);
+
         $tournament->update(array_merge($data, [
             'is_public' => $request->boolean('is_public', $tournament->is_public),
             'has_draft' => $request->boolean('has_draft', $tournament->has_draft),
@@ -105,12 +114,16 @@ class AdminTournamentController extends Controller
             'registration_closes_at' => ['nullable', 'date', 'after_or_equal:registration_opens_at'],
             'squad_size' => [$creating ? 'required' : 'sometimes', 'integer', 'min:1', 'max:99'],
             'has_draft' => ['sometimes', 'boolean'],
-            'ball_type' => ['sometimes', 'string', 'in:leather,tennis'],
+            'ball_type' => ['sometimes', 'string', 'in:leather,tennis,hard_ball,tape_ball,indoor'],
             'data_source' => ['sometimes', 'string', 'in:verified,manual'],
             'default_pick_duration' => [$creating ? 'required' : 'sometimes', 'integer', 'min:5', 'max:3600'],
             'cricket_rule_profile_id' => ['nullable', 'integer', 'exists:cricket_rule_profiles,id'],
             'default_overs_per_innings' => ['nullable', 'integer', 'min:1', 'max:100'],
             'is_public' => ['sometimes', 'boolean'],
+            'organizer_name' => ['nullable', 'string', 'max:200'],
+            'contact_info' => ['nullable', 'string', 'max:500'],
+            'competition_structure' => ['nullable', 'string', 'in:League,Knockout,Group+Playoffs,Custom'],
+            'tournament_code' => ['nullable', 'string', 'max:50', 'unique:tournaments,tournament_code'],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'banner' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'remove_logo' => ['sometimes', 'boolean'],

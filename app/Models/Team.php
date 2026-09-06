@@ -21,6 +21,11 @@ class Team extends Model
         'logo_path',
         'display_order',
         'is_active',
+        'creator_id',
+        'vice_captain_name',
+        'manager_name',
+        'wicketkeeper_name',
+        'status',
     ];
 
     protected function casts(): array
@@ -87,5 +92,10 @@ class Team extends Model
     public function awayFixtures(): HasMany
     {
         return $this->hasMany(Fixture::class, 'away_team_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
     }
 }

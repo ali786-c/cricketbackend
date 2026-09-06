@@ -66,14 +66,14 @@ class TeamComparisonService
 
         $matches = CricketMatch::query()
             ->where('status', 'completed')
-            ->where(function ($q) use ($team1Id, $team2Id) {
+            ->whereHas('fixture', function ($q) use ($team1Id, $team2Id) {
                 $q->where(function ($q1) use ($team1Id, $team2Id) {
                     $q1->where('home_team_id', $team1Id)->where('away_team_id', $team2Id);
                 })->orWhere(function ($q2) use ($team1Id, $team2Id) {
                     $q2->where('home_team_id', $team2Id)->where('away_team_id', $team1Id);
                 });
             })
-            ->with(['homeTeam', 'awayTeam'])
+            ->with(['fixture.homeTeam', 'fixture.awayTeam', 'winner'])
             ->latest('id')
             ->get();
 
@@ -83,7 +83,7 @@ class TeamComparisonService
 
         $encounters = [];
         foreach ($matches as $match) {
-            $winnerId = $match->winner_id;
+            $winnerId = $match->winner_team_id;
             if ($winnerId === $team1Id) {
                 $t1Wins++;
                 $resultText = "{$t1->short_name} won";
@@ -98,14 +98,13 @@ class TeamComparisonService
             $encounters[] = [
                 'match_id' => $match->id,
                 'date' => $match->completed_at?->toDateString(),
-                'venue' => $match->venue,
                 'home_team' => [
-                    'id' => $match->home_team_id,
-                    'short_name' => $match->homeTeam?->short_name,
+                    'id' => $match->fixture?->home_team_id,
+                    'short_name' => $match->fixture?->homeTeam?->short_name,
                 ],
                 'away_team' => [
-                    'id' => $match->away_team_id,
-                    'short_name' => $match->awayTeam?->short_name,
+                    'id' => $match->fixture?->away_team_id,
+                    'short_name' => $match->fixture?->awayTeam?->short_name,
                 ],
                 'winner_id' => $winnerId,
                 'result_text' => $resultText,
