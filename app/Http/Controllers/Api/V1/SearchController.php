@@ -33,7 +33,7 @@ class SearchController extends Controller
             'status' => ['nullable', 'string'],
         ]);
 
-        $types = $validated['type']
+        $types = ($validated['type'] ?? null)
             ? array_map('trim', explode(',', $validated['type']))
             : ['players', 'teams', 'tournaments', 'matches'];
 
