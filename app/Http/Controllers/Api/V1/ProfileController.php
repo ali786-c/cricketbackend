@@ -65,19 +65,19 @@ class ProfileController extends Controller
             ->get()
             ->map(fn ($mp) => [
                 'id' => $mp->match?->id,
-                'tournament_name' => $mp->match->tournament?->name,
-                'opponent' => $mp->match->fixture
+                'tournament_name' => $mp->match?->tournament?->name,
+                'opponent' => $mp->match?->fixture
                     ? ($mp->team_id === $mp->match->fixture->home_team_id
                         ? $mp->match->fixture->awayTeam?->name
                         : $mp->match->fixture->homeTeam?->name)
                     : 'TBD',
-                'venue' => $mp->match->fixture?->venue,
-                'date' => $mp->match->fixture?->scheduled_at?->toDateString(),
+                'venue' => $mp->match?->fixture?->venue,
+                'date' => $mp->match?->fixture?->scheduled_at?->toDateString(),
                 'runs' => $mp->inningsBattingStats->sum('runs'),
                 'wickets' => $mp->inningsBowlingStats->sum('wickets'),
                 'overs_bowled' => \round($mp->inningsBowlingStats->sum('legal_balls') / 6, 1),
-                'result' => $mp->match->result_summary,
-                'match_type' => $mp->match->tournament->cricketRuleProfile?->format,
+                'result' => $mp->match?->result_summary,
+                'match_type' => $mp->match?->tournament?->cricketRuleProfile?->format,
             ]);
 
         return response()->json(['data' => $matches]);

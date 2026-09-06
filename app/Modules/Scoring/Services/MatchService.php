@@ -4,6 +4,7 @@ namespace App\Modules\Scoring\Services;
 
 use App\Models\AuditLog;
 use App\Models\CricketMatch;
+use App\Models\CricketRuleProfile;
 use App\Models\Draft;
 use App\Models\MatchInnings;
 use App\Models\MatchPlayer;
@@ -24,8 +25,24 @@ class MatchService
         return $this->database->transaction(function () use ($tournament, $homeTeamId, $awayTeamId, $fixtureId, $actorId, $oversPerInnings) {
             $tournament = Tournament::query()->with('cricketRuleProfile')->lockForUpdate()->findOrFail($tournament->id);
             $profile = $tournament->cricketRuleProfile;
+
+            // Auto-create a default rule profile if none exists
             if (! $profile || ! $profile->is_active) {
-                $this->fail('match', 'Configure an active cricket rule profile before creating a match.');
+                $profile = CricketRuleProfile::updateOrCreate(
+                    ['slug' => 'default-' . $tournament->id, 'is_active' => true],
+                    [
+                        'name' => 'Default Rules (' . $tournament->name . ')',
+                        'format' => 'T20',
+                        'overs_per_innings' => $tournament->default_overs_per_innings ?? 20,
+                        'wickets_per_innings' => 10,
+                        'playing_xi_size' => 11,
+                        'max_over_per_bowler' => 4,
+                        'version' => 1,
+                        'is_active' => true,
+                    ]
+                );
+                $tournament->update(['cricket_rule_profile_id' => $profile->id]);
+                $profile = $tournament->fresh('cricketRuleProfile')->cricketRuleProfile;
             }
 
             $teamIds = collect([$homeTeamId, $awayTeamId])->map(fn ($id) => (int) $id);

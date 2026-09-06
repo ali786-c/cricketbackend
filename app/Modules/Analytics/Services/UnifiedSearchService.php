@@ -188,11 +188,18 @@ class UnifiedSearchService
             ->with(['fixture.homeTeam', 'fixture.awayTeam', 'tournament']);
 
         $q->where(function ($sub) use ($query) {
-            $sub->whereHas('fixture.homeTeam', fn($t) => $t->where('name', 'like', "%{$query}%")
-                    ->orWhere('short_name', 'like', "%{$query}%"))
-                ->orWhereHas('fixture.awayTeam', fn($t) => $t->where('name', 'like', "%{$query}%")
-                    ->orWhere('short_name', 'like', "%{$query}%"))
-                ->orWhereHas('tournament', fn($t) => $t->where('name', 'like', "%{$query}%"));
+            // Search by fixture teams (home or away)
+            $sub->whereHas('fixture', function ($fixtureQ) use ($query) {
+                $fixtureQ->whereHas('homeTeam', function ($teamQ) use ($query) {
+                    $teamQ->where('name', 'like', "%{$query}%")
+                        ->orWhere('short_name', 'like', "%{$query}%");
+                })->orWhereHas('awayTeam', function ($teamQ) use ($query) {
+                    $teamQ->where('name', 'like', "%{$query}%")
+                        ->orWhere('short_name', 'like', "%{$query}%");
+                });
+            });
+            // Also search by tournament name
+            $sub->orWhereHas('tournament', fn($t) => $t->where('name', 'like', "%{$query}%"));
         });
 
         if ($tournamentId) {
