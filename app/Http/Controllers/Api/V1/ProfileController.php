@@ -58,8 +58,14 @@ class ProfileController extends Controller
 
     public function matches(PlayerProfile $playerProfile): JsonResponse
     {
-        $matches = \App\Models\MatchPlayer::query()
+        // match_players has tournament_player_id, NOT player_profile_id
+        // So we join through tournament_players to find matches for this player
+        $tournamentPlayerIds = \App\Models\TournamentPlayer::query()
             ->where('player_profile_id', $playerProfile->id)
+            ->pluck('id');
+
+        $matches = \App\Models\MatchPlayer::query()
+            ->whereIn('tournament_player_id', $tournamentPlayerIds)
             ->with(['match.tournament', 'match.fixture.homeTeam', 'match.fixture.awayTeam', 'inningsBattingStats', 'inningsBowlingStats'])
             ->latest()
             ->get()
