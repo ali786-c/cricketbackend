@@ -590,7 +590,7 @@ class DraftService
                 'picks.round',
                 'picks.tournamentPlayer.playerProfile',
             ]);
-            $activePick = $draft->picks->firstWhere('status', 'active)
+            $activePick = $draft->picks->firstWhere('status', 'active')
                 ?? $draft->picks->firstWhere('status', 'expired');
         }
 
