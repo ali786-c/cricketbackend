@@ -7,6 +7,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::resolve(\App\Modules\Draft\Console\Commands\ExpireDraftPicks::class);
+use Illuminate\Support\Facades\Schedule;
 
+Schedule::command('drafts:expire-picks')->everyMinute();
 
