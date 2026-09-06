@@ -36,19 +36,36 @@ class UnifiedSearchService
         $results = [];
 
         if (in_array('players', $types, true)) {
-            $results['players'] = $this->searchPlayers($query, $isCode, $limit, $options);
+            try {
+                $results['players'] = $this->searchPlayers($query, $isCode, $limit, $options);
+            } catch (\Throwable $e) {
+                $results['players'] = [];
+            }
         }
 
         if (in_array('teams', $types, true)) {
-            $results['teams'] = $this->searchTeams($query, $isCode, $limit, $options, $tournamentId);
+            try {
+                $results['teams'] = $this->searchTeams($query, $isCode, $limit, $options, $tournamentId);
+            } catch (\Throwable $e) {
+                $results['teams'] = [];
+            }
         }
 
         if (in_array('tournaments', $types, true)) {
-            $results['tournaments'] = $this->searchTournaments($query, $isCode, $limit, $options);
+            try {
+                $results['tournaments'] = $this->searchTournaments($query, $isCode, $limit, $options);
+            } catch (\Throwable $e) {
+                $results['tournaments'] = [];
+            }
         }
 
         if (in_array('matches', $types, true)) {
-            $results['matches'] = $this->searchMatches($query, $isCode, $limit, $tournamentId);
+            try {
+                $results['matches'] = $this->searchMatches($query, $isCode, $limit, $tournamentId);
+            } catch (\Throwable $e) {
+                // If match search fails (e.g. missing table/column), return empty
+                $results['matches'] = [];
+            }
         }
 
         $results['meta'] = [
