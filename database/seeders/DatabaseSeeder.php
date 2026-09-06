@@ -15,7 +15,6 @@ class DatabaseSeeder extends Seeder
         $admin = User::factory()->create([
             'name' => 'System Admin',
             'email' => 'admin@cricketdraft.test',
-            'password' => 'password',
         ]);
 
         $admin->assignRole('admin');
@@ -23,7 +22,6 @@ class DatabaseSeeder extends Seeder
         $superAdmin = User::factory()->create([
             'name' => 'Platform Super Admin',
             'email' => 'superadmin@cricketdraft.test',
-            'password' => 'password',
         ]);
         $superAdmin->assignRole('super_admin');
 
