@@ -49,7 +49,7 @@ class PlayerRepository @Inject constructor(
     }
 
     fun getPlayersByTeam(teamId: String): Flow<List<RegisteredPlayer>> =
-        playerDao.getPlayersByTeam(teamId, teamId.hashCode().toString()).map { entities ->
+        playerDao.getPlayersByTeam(teamId).map { entities ->
             entities.map { it.toDomain() }
         }
 

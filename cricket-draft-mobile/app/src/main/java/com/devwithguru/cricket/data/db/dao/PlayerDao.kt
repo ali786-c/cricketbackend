@@ -27,8 +27,8 @@ interface PlayerDao {
     @Query("SELECT COUNT(*) FROM players")
     suspend fun count(): Int
 
-    @Query("SELECT * FROM players WHERE teamId = :teamId OR teamId = :teamIdHash ORDER BY id")
-    fun getPlayersByTeam(teamId: String, teamIdHash: String): Flow<List<PlayerEntity>>
+    @Query("SELECT * FROM players WHERE teamId = :teamId ORDER BY id")
+    fun getPlayersByTeam(teamId: String): Flow<List<PlayerEntity>>
 
     @Query("UPDATE players SET teamId = :teamId WHERE id = :id")
     suspend fun updateTeamId(id: String, teamId: String?)

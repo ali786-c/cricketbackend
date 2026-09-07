@@ -21,7 +21,8 @@ import javax.inject.Inject
 class FixtureViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val fixtureRepository: FixtureRepository,
-    private val stageRepository: StageRepository
+    private val stageRepository: StageRepository,
+    private val authRepository: com.devwithguru.cricket.data.repository.AuthRepository
 ) : ViewModel() {
 
     private var tournamentId: String = savedStateHandle["tournamentId"] ?: ""

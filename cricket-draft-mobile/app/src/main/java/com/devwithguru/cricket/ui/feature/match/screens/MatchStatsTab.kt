@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
+import com.devwithguru.cricket.ui.feature.match.screens.MatchStatCompareBar
 import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerViewModel
 import com.devwithguru.cricket.domain.model.ScheduledFixture
 
@@ -29,7 +31,7 @@ fun MatchStatsTab(
 ) {
     val fixtureData = activeFixture ?: remember(matchId) { null }
     val currentInnings = fixtureData?.currentInnings ?: 1
-    val isCompleted = activeFixture?.status == "Completed"
+    val isCompleted = activeFixture?.status?.lowercase() == "completed"
 
     // 1. RUNS & BALLS CALCULATIONS
     val homeRuns = if (currentInnings == 1) {
@@ -133,7 +135,7 @@ fun MatchStatsTab(
         Text(
             text = "Team Comparison Statistics",
             color = MaterialTheme.colorScheme.primary,
-            fontSize = 14.sp,
+            fontSize = screenConfig.bodyTextSize,
             fontWeight = FontWeight.Bold
         )
 

@@ -14,7 +14,7 @@ data class LoginRequest(
     val email: String,
     val password: String,
     val device_name: String = "android-app",
-    val client_slug: String? = null
+    val client_slug: String? = "cricket-app-android"
 )
 
 data class UpdateProfileRequest(

@@ -444,6 +444,65 @@ interface ApiService {
      * Create a fixture.
      * POST /api/v1/admin/tournaments/{tournamentId}/fixtures
      */
+    @POST("api/v1/admin/tournaments/{tournamentId}/fixtures")
+    suspend fun createFixture(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Body request: CreateFixtureRequest
+    ): Response<AdminFixtureResponse>
+
+    /**
+     * Update a fixture.
+     * PUT /api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}
+     */
+    @PUT("api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}")
+    suspend fun updateFixture(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("fixtureId") fixtureId: String,
+        @Body request: CreateFixtureRequest
+    ): Response<AdminFixtureResponse>
+
+    /**
+     * Delete a fixture.
+     * DELETE /api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}
+     */
+    @DELETE("api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}")
+    suspend fun deleteFixture(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("fixtureId") fixtureId: String
+    ): Response<Unit>
+
+    /**
+     * Update fixture status.
+     * POST /api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}/status
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}/status")
+    suspend fun updateFixtureStatus(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("fixtureId") fixtureId: String,
+        @Body request: UpdateFixtureStatusRequest
+    ): Response<AdminFixtureResponse>
+
+    /**
+     * Create match from fixture.
+     * POST /api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}/create-match
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}/create-match")
+    suspend fun createMatchFromFixture(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("fixtureId") fixtureId: String
+    ): Response<CreateMatchFromFixtureResponse>
+
+    // ─── Admin Draft Setup ─────────────────────────────────
+
+    /**
+     * Save draft setup (rounds & picks).
+     * PUT /api/v1/admin/tournaments/{tournamentId}/draft/setup
+     */
     @PUT("api/v1/admin/tournaments/{tournamentId}/draft/setup")
     suspend fun saveDraftSetup(
         @Header("Authorization") token: String,
@@ -451,12 +510,172 @@ interface ApiService {
         @Body request: DraftSetupRequest
     ): Response<SimpleMessageResponse>
 
-    @POST("api/v1/admin/tournaments/{tournamentId}/fixtures")
-    suspend fun createFixture(
+    // ─── Admin Match Endpoints ─────────────────────────────
+
+    /**
+     * List matches for a tournament (admin).
+     * GET /api/v1/admin/tournaments/{tournamentId}/matches
+     */
+    @GET("api/v1/admin/tournaments/{tournamentId}/matches")
+    suspend fun getAdminMatches(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String
+    ): Response<AdminMatchListResponse>
+
+    /**
+     * Get match details (admin).
+     * GET /api/v1/admin/tournaments/{tournamentId}/matches/{matchId}
+     */
+    @GET("api/v1/admin/tournaments/{tournamentId}/matches/{matchId}")
+    suspend fun getAdminMatch(
         @Header("Authorization") token: String,
         @Path("tournamentId") tournamentId: String,
-        @Body request: CreateFixtureRequest
-    ): Response<AdminFixtureResponse>
+        @Path("matchId") matchId: String
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Create a match from draft squads.
+     * POST /api/v1/admin/tournaments/{tournamentId}/matches
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/matches")
+    suspend fun createMatch(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Body request: CreateMatchRequest
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Update match overs.
+     * PATCH /api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/overs
+     */
+    @PATCH("api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/overs")
+    suspend fun updateMatchOvers(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("matchId") matchId: String,
+        @Body request: UpdateOversRequest
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Submit playing XI for a team.
+     * POST /api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/teams/{teamId}/playing-xi
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/teams/{teamId}/playing-xi")
+    suspend fun submitPlayingXi(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("matchId") matchId: String,
+        @Path("teamId") teamId: String,
+        @Body request: PlayingXiRequest
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Approve both playing XIs.
+     * POST /api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/approve-lineup
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/approve-lineup")
+    suspend fun approveLineup(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("matchId") matchId: String
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Record toss result.
+     * POST /api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/toss
+     */
+    @POST("api/v1/admin/tournaments/{tournamentId}/matches/{matchId}/toss")
+    suspend fun recordToss(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Path("matchId") matchId: String,
+        @Body request: TossRequest
+    ): Response<AdminMatchDetailResponse>
+
+    // ─── Result Endpoints ──────────────────────────────────
+
+    /**
+     * Submit match result for approval.
+     * POST /api/v1/admin/matches/{matchId}/result/submit
+     */
+    @POST("api/v1/admin/matches/{matchId}/result/submit")
+    suspend fun submitMatchResult(
+        @Header("Authorization") token: String,
+        @Path("matchId") matchId: String
+    ): Response<AdminMatchDetailResponse>
+
+    /**
+     * Approve match result.
+     * POST /api/v1/admin/matches/{matchId}/result/approve
+     */
+    @POST("api/v1/admin/matches/{matchId}/result/approve")
+    suspend fun approveMatchResult(
+        @Header("Authorization") token: String,
+        @Path("matchId") matchId: String
+    ): Response<AdminMatchDetailResponse>
+
+    // ─── Offline Sync Endpoint ─────────────────────────────
+
+    /**
+     * Sync offline deliveries.
+     * POST /api/v1/matches/{matchId}/deliveries/sync
+     */
+    @POST("api/v1/matches/{matchId}/deliveries/sync")
+    suspend fun syncDeliveries(
+        @Header("Authorization") token: String,
+        @Path("matchId") matchId: String,
+        @Body request: SyncDeliveriesRequest
+    ): Response<SyncDeliveriesResponse>
+
+    // ─── Delivery Edit Endpoint ────────────────────────────
+
+    /**
+     * Edit a delivery (post-match correction).
+     * PATCH /api/v1/deliveries/{deliveryId}
+     */
+    @PATCH("api/v1/deliveries/{deliveryId}")
+    suspend fun editDelivery(
+        @Header("Authorization") token: String,
+        @Path("deliveryId") deliveryId: String,
+        @Body request: EditDeliveryRequest
+    ): Response<EditDeliveryResponse>
+
+    // ─── Player Comparison Endpoint ────────────────────────
+
+    /**
+     * Compare two players in a tournament.
+     * GET /api/v1/tournaments/{tournamentId}/players/compare?player1_id=X&player2_id=Y
+     */
+    @GET("api/v1/tournaments/{tournamentId}/players/compare")
+    suspend fun comparePlayers(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @retrofit2.http.Query("player1_id") player1Id: String,
+        @retrofit2.http.Query("player2_id") player2Id: String
+    ): Response<PlayerComparisonResponse>
+
+    // ─── Team Comparison Endpoint ──────────────────────────
+
+    /**
+     * Compare two teams (H2H).
+     * GET /api/v1/teams/compare?team1_id=X&team2_id=Y
+     */
+    @GET("api/v1/teams/compare")
+    suspend fun compareTeams(
+        @retrofit2.http.Query("team1_id") team1Id: String,
+        @retrofit2.http.Query("team2_id") team2Id: String
+    ): Response<TeamComparisonResponse>
+
+    // ─── Standings Simulation Endpoint ─────────────────────
+
+    /**
+     * Simulate standings possibilities.
+     * GET /api/v1/tournaments/{tournamentId}/standings/simulate
+     */
+    @GET("api/v1/tournaments/{tournamentId}/standings/simulate")
+    suspend fun simulateStandings(
+        @Path("tournamentId") tournamentId: String
+    ): Response<StandingsSimulationResponse>
 
     // ─── Auth Token Provider ───────────────────────────────
 

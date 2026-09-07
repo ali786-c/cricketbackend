@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.devwithguru.cricket.data.repository.FixtureRepository
 import com.devwithguru.cricket.data.repository.MatchApiRepository
+import com.devwithguru.cricket.data.sync.SyncManager
 import com.devwithguru.cricket.domain.model.ScheduledFixture
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -17,7 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class MatchCenterViewModel @Inject constructor(
     private val fixtureRepository: FixtureRepository,
-    private val matchApiRepository: MatchApiRepository
+    private val matchApiRepository: MatchApiRepository,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _fixture = MutableStateFlow<ScheduledFixture?>(null)
@@ -34,22 +36,36 @@ class MatchCenterViewModel @Inject constructor(
 
     private var pollingJob: Job? = null
 
+    private val _isPreSyncing = MutableStateFlow(false)
+    val isPreSyncing: StateFlow<Boolean> = _isPreSyncing
+
     /**
-     * Load fixture data — tries API first, falls back to Room.
+     * Load fixture data with pre-sync.
+     * Flow: push local → pull server → load from Room → try API for live data.
+     * This ensures mobile-created offline data reaches the server first.
      */
     fun loadFixture(matchId: String) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
+            // Step 1: Pre-sync — push local data first, then pull server data
+            if (syncManager.isOnline()) {
+                _isPreSyncing.value = true
+                try {
+                    syncManager.pushPendingChanges()
+                    syncManager.pullLatestData()
+                } catch (_: Exception) { }
+                _isPreSyncing.value = false
+            }
+
+            // Step 2: Load from Room (now has fresh server data)
             try {
-                // Collect from the flow (emits cache first, then API data)
                 matchApiRepository.getMatchState(matchId).collect { fixture ->
                     if (fixture != null) {
                         _fixture.value = fixture
                         _isLive.value = fixture.status == "Live"
 
-                        // Start polling if match is live
                         if (_isLive.value) {
                             startPolling(matchId)
                         }
@@ -100,11 +116,14 @@ class MatchCenterViewModel @Inject constructor(
                     val updated = matchApiRepository.pollMatchState(matchId)
                     if (updated != null) {
                         _fixture.value = updated
-                        // Check if match ended
                         if (updated.status != "Live") {
                             _isLive.value = false
                             break
                         }
+                    } else {
+                        // Fixture not found on server — stop polling
+                        _isLive.value = false
+                        break
                     }
                 } catch (e: Exception) {
                     // Silently retry on next interval
@@ -128,6 +147,12 @@ class MatchCenterViewModel @Inject constructor(
         viewModelScope.launch {
             fixtureRepository.updateFixture(fixture)
             _fixture.value = fixture
+            // If status changed, update it on server too
+            if (fixture.status == "Completed" || fixture.status == "Live") {
+                try {
+                    fixtureRepository.updateStatus(fixture.id, fixture.status)
+                } catch (_: Exception) { }
+            }
         }
     }
 

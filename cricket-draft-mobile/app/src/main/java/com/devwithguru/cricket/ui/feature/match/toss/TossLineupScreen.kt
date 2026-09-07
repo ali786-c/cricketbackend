@@ -73,6 +73,7 @@ fun TossLineupScreen(
     }
 
     val squadSize by viewModel.squadSize.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     // Selected Player IDs
     var selectedHomePlayers by remember(matchId) { mutableStateOf(setOf<String>()) }
@@ -200,7 +201,15 @@ fun TossLineupScreen(
                     )
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
                 // Toss Result Banner (if toss was done)
                 if (tossWinner.isNotBlank()) {
                     Card(
@@ -391,6 +400,7 @@ fun TossLineupScreen(
                 }
             )
         }
+    }
     }
 }
 

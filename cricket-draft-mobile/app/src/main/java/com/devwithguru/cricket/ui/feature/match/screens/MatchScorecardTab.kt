@@ -50,109 +50,147 @@ fun MatchScorecardTab(
     viewModel: LiveScorerViewModel,
     activeFixture: ScheduledFixture? = null
 ) {
-    var selectedInningsTab by remember { mutableStateOf(0) }
-    val inningsList = listOf("$homeTeam Innings", "$awayTeam Innings")
+    val isCompleted = activeFixture?.status?.equals("completed", ignoreCase = true) == true
+    val (innings1Team, innings2Team) = remember(activeFixture, homeTeam, awayTeam) {
+        val tossWinner = activeFixture?.tossWinner ?: ""
+        val tossDecision = activeFixture?.tossDecision ?: ""
+        when {
+            tossWinner.equals(homeTeam, ignoreCase = true) -> {
+                if (tossDecision.equals("bat", ignoreCase = true)) Pair(homeTeam, awayTeam) else Pair(awayTeam, homeTeam)
+            }
+            tossWinner.equals(awayTeam, ignoreCase = true) -> {
+                if (tossDecision.equals("bat", ignoreCase = true)) Pair(awayTeam, homeTeam) else Pair(homeTeam, awayTeam)
+            }
+            else -> Pair(homeTeam, awayTeam)
+        }
+    }
+    val inningsList = listOf("$innings1Team Innings", "$innings2Team Innings")
 
     val fixtureData = activeFixture
     val currentInnings = fixtureData?.currentInnings ?: 1
+    var selectedInningsTab by remember { mutableIntStateOf(if (currentInnings == 2) 1 else 0) }
 
-    val battingList = remember(selectedInningsTab, currentInnings, viewModel.state) {
+    val battingList = remember(selectedInningsTab, currentInnings, isCompleted, viewModel.state, activeFixture) {
         if (selectedInningsTab == 0) {
             // Innings 1 Batting
-            if (currentInnings == 1) {
-                // Read live from ViewModel
-                viewModel.state.batsmenStats.values.map { b ->
-                    val status = getDismissalText(b)
-                    val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
-                    BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
-                }
-            } else {
-                // Read historical from fixture
+            if (isCompleted) {
                 fixtureData?.firstInningsBatsmen?.map { b ->
                     val status = getDismissalText(b)
                     val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
                     BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
                 } ?: emptyList()
+            } else {
+                if (currentInnings == 1) {
+                    viewModel.state.batsmenStats.values.map { b ->
+                        val status = getDismissalText(b)
+                        val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
+                        BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
+                    }
+                } else {
+                    fixtureData?.firstInningsBatsmen?.map { b ->
+                        val status = getDismissalText(b)
+                        val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
+                        BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
+                    } ?: emptyList()
+                }
             }
         } else {
             // Innings 2 Batting
-            if (currentInnings == 2) {
-                // Read live from ViewModel
-                viewModel.state.batsmenStats.values.map { b ->
+            if (isCompleted) {
+                fixtureData?.secondInningsBatsmen?.map { b ->
                     val status = getDismissalText(b)
                     val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
                     BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
-                }
-            } else if (activeFixture?.status == "Completed") {
-                // Read historical from fixture
-                activeFixture.secondInningsBatsmen.map { b ->
-                    val status = getDismissalText(b)
-                    val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
-                    BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
-                }
+                } ?: emptyList()
             } else {
-                emptyList()
+                if (currentInnings == 2) {
+                    viewModel.state.batsmenStats.values.map { b ->
+                        val status = getDismissalText(b)
+                        val sr = if (b.balls > 0) String.format("%.1f", (b.runs * 100f / b.balls)) else "0.0"
+                        BattingCardRow(b.name, status, b.runs, b.balls, b.fours, b.sixes, sr)
+                    }
+                } else {
+                    emptyList()
+                }
             }
         }
     }
 
-    val bowlingList = remember(selectedInningsTab, currentInnings, viewModel.state) {
+    val bowlingList = remember(selectedInningsTab, currentInnings, isCompleted, viewModel.state, activeFixture) {
         if (selectedInningsTab == 0) {
-            // Innings 1 Bowling (Bowled by Away Team)
-            if (currentInnings == 1) {
-                // Read live from ViewModel
-                viewModel.state.bowlersStats.values.map { b ->
-                    val overs = "${b.balls / 6}.${b.balls % 6}"
-                    val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
-                    BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
-                }
-            } else {
-                // Read historical from fixture
+            // Innings 1 Bowling (Bowled by Innings 2 Team)
+            if (isCompleted) {
                 fixtureData?.firstInningsBowlers?.map { b ->
                     val overs = "${b.balls / 6}.${b.balls % 6}"
                     val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
                     BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
                 } ?: emptyList()
-            }
-        } else {
-            // Innings 2 Bowling (Bowled by Home Team)
-            if (currentInnings == 2) {
-                // Read live from ViewModel
-                viewModel.state.bowlersStats.values.map { b ->
-                    val overs = "${b.balls / 6}.${b.balls % 6}"
-                    val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
-                    BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
-                }
-            } else if (activeFixture?.status == "Completed") {
-                // Read historical from fixture
-                activeFixture.secondInningsBowlers.map { b ->
-                    val overs = "${b.balls / 6}.${b.balls % 6}"
-                    val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
-                    BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
-                }
             } else {
-                emptyList()
+                if (currentInnings == 1) {
+                    viewModel.state.bowlersStats.values.map { b ->
+                        val overs = "${b.balls / 6}.${b.balls % 6}"
+                        val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
+                        BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
+                      }
+                } else {
+                    fixtureData?.firstInningsBowlers?.map { b ->
+                        val overs = "${b.balls / 6}.${b.balls % 6}"
+                        val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
+                        BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
+                    } ?: emptyList()
+                }
+            }
+        } else {
+            // Innings 2 Bowling (Bowled by Innings 1 Team)
+            if (isCompleted) {
+                fixtureData?.secondInningsBowlers?.map { b ->
+                    val overs = "${b.balls / 6}.${b.balls % 6}"
+                    val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
+                    BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
+                } ?: emptyList()
+            } else {
+                if (currentInnings == 2) {
+                    viewModel.state.bowlersStats.values.map { b ->
+                        val overs = "${b.balls / 6}.${b.balls % 6}"
+                        val econ = if (b.balls > 0) String.format("%.2f", (b.runsConceded.toFloat() / (b.balls.toFloat() / 6f))) else "0.00"
+                        BowlingCardRow(b.name, overs, 0, b.runsConceded, b.wickets, econ)
+                    }
+                } else {
+                    emptyList()
+                }
             }
         }
     }
 
-    val fowList = remember(selectedInningsTab, currentInnings, viewModel.state) {
+    val fowList = remember(selectedInningsTab, currentInnings, isCompleted, viewModel.state, activeFixture) {
         if (selectedInningsTab == 0) {
-            if (currentInnings == 1) viewModel.state.fallOfWickets
-            else fixtureData?.firstInningsFOW ?: emptyList()
+            if (isCompleted) fixtureData?.firstInningsFOW ?: emptyList()
+            else {
+                if (currentInnings == 1) viewModel.state.fallOfWickets
+                else fixtureData?.firstInningsFOW ?: emptyList()
+            }
         } else {
-            if (currentInnings == 2) viewModel.state.fallOfWickets
-            else fixtureData?.secondInningsFOW ?: emptyList()
+            if (isCompleted) fixtureData?.secondInningsFOW ?: emptyList()
+            else {
+                if (currentInnings == 2) viewModel.state.fallOfWickets
+                else fixtureData?.secondInningsFOW ?: emptyList()
+            }
         }
     }
 
-    val partnershipsList = remember(selectedInningsTab, currentInnings, viewModel.state) {
+    val partnershipsList = remember(selectedInningsTab, currentInnings, isCompleted, viewModel.state, activeFixture) {
         if (selectedInningsTab == 0) {
-            if (currentInnings == 1) viewModel.state.partnerships
-            else fixtureData?.firstInningsPartnerships ?: emptyList()
+            if (isCompleted) fixtureData?.firstInningsPartnerships ?: emptyList()
+            else {
+                if (currentInnings == 1) viewModel.state.partnerships
+                else fixtureData?.firstInningsPartnerships ?: emptyList()
+            }
         } else {
-            if (currentInnings == 2) viewModel.state.partnerships
-            else fixtureData?.secondInningsPartnerships ?: emptyList()
+            if (isCompleted) fixtureData?.secondInningsPartnerships ?: emptyList()
+            else {
+                if (currentInnings == 2) viewModel.state.partnerships
+                else fixtureData?.secondInningsPartnerships ?: emptyList()
+            }
         }
     }
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,10 +63,10 @@ fun LiveScorerScreen(
     initialPartnerships: List<PartnershipEvent> = emptyList(),
     initialActivePartnershipRuns: Int = 0,
     initialActivePartnershipBalls: Int = 0,
-    viewModel: LiveScorerViewModel = remember { LiveScorerViewModel() }
+    viewModel: LiveScorerViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
 
-    LaunchedEffect(homeTeamName, awayTeamName) {
+    LaunchedEffect(homeTeamName, awayTeamName, homeSquadList, awaySquadList, isInnings2) {
         viewModel.initialize(
             runs = initialRuns,
             wickets = initialWickets,
@@ -129,7 +130,7 @@ fun LiveScorerScreen(
 
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -148,7 +149,7 @@ fun LiveScorerScreen(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(4.dp)
-                                .size(28.dp)
+                                .size(32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
@@ -192,13 +193,13 @@ fun LiveScorerScreen(
                             Text(
                                 text = "$battingTeamAbbr  ",
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 24.sp,
+                                fontSize = screenConfig.scoreTextSize,
                                 fontWeight = FontWeight.Black
                             )
                             Text(
                                 text = "${state.runs}/${state.wickets}",
                                 color = MaterialTheme.colorScheme.onBackground,
-                                fontSize = 32.sp,
+                                fontSize = screenConfig.displayTextSize,
                                 fontWeight = FontWeight.ExtraBold
                             )
                         }
@@ -221,6 +222,7 @@ fun LiveScorerScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
                                 .padding(top = 8.dp, bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -235,9 +237,7 @@ fun LiveScorerScreen(
                             MetricDivider()
 
                             // 3. Partnership
-                            val partnershipRuns = state.batter1.runs + state.batter2.runs
-                            val partnershipBalls = state.batter1.balls + state.batter2.balls
-                            MetricItem(label = "PARTN", value = "$partnershipRuns($partnershipBalls)", modifier = Modifier.weight(1f))
+                            MetricItem(label = "PARTN", value = "${state.activePartnershipRuns}(${state.activePartnershipBalls})", modifier = Modifier.weight(1f))
 
                             MetricDivider()
 
@@ -259,7 +259,7 @@ fun LiveScorerScreen(
 
                 // --- ACTIVE BATSMEN & BOWLERS PANEL ---
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Batsmen Box
@@ -268,7 +268,7 @@ fun LiveScorerScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1.5f)
-                            .fillMaxHeight()
+                            .wrapContentHeight()
                             .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                     ) {
                         Column(
@@ -386,7 +386,7 @@ fun LiveScorerScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
+                            .wrapContentHeight()
                             .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                             .clickable { viewModel.showSelectBowlerDialog = true }
                     ) {
@@ -484,7 +484,7 @@ fun LiveScorerScreen(
 
                                 Box(
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .size(32.dp)
                                         .clip(CircleShape)
                                         .background(bubbleBg)
                                         .border(1.dp, bubbleBorder, CircleShape),
@@ -612,7 +612,7 @@ fun LiveScorerScreen(
                                             onClick = { viewModel.recordRuns(run) { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(38.dp),
+                                                .height(40.dp),
                                             shape = RoundedCornerShape(8.dp),
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -635,7 +635,7 @@ fun LiveScorerScreen(
                                             onClick = { viewModel.recordRuns(boundary) { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(38.dp),
+                                                .height(40.dp),
                                             shape = RoundedCornerShape(8.dp),
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
@@ -662,7 +662,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.recordExtra("Wd") { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -677,7 +677,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.recordExtra("Nb") { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -692,7 +692,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.showWicketDialog = true },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
@@ -713,7 +713,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.recordExtra("By") { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -728,7 +728,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.recordExtra("Lb") { r, w, o, s, n -> onScoreChanged?.invoke(r, w, o, s, n) } },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -743,7 +743,7 @@ fun LiveScorerScreen(
                                         onClick = { viewModel.showAdvancedKeyboard = true },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(32.dp),
+                                            .height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
@@ -786,7 +786,7 @@ fun LiveScorerScreen(
                                     ),
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                                    modifier = Modifier.height(32.dp)
+                                    modifier = Modifier.height(36.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Undo,
@@ -876,7 +876,7 @@ fun LiveScorerScreen(
                 ) {
                     Text(
                         text = extraLabel,
-                        fontSize = 16.sp,
+                        fontSize = screenConfig.headingTextSize,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )

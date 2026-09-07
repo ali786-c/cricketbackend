@@ -45,6 +45,7 @@ import com.devwithguru.cricket.data.db.entity.AdminFixtureEntity
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 private fun <T> MutableList<T>.swap(i: Int, j: Int) { val tmp = this[i]; this[i] = this[j]; this[j] = tmp }
 
@@ -156,7 +157,7 @@ fun TournamentSetupScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(if (hasDraft) "Draft Setup" else "Tournament Setup", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                title = { Text(if (hasDraft) "Draft Setup" else "Tournament Setup", fontSize = screenConfig.titleTextSize, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground)
@@ -299,7 +300,7 @@ private fun StatusTabContent(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Tournament Status", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(status.replaceFirstChar { it.uppercase() }, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(status.replaceFirstChar { it.uppercase() }, fontSize = screenConfig.headingTextSize, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
@@ -375,7 +376,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
         shape = RoundedCornerShape(10.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+            Text(value, fontSize = screenConfig.scoreTextSize, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
             Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -417,7 +418,7 @@ private fun TeamsTabContent(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Groups, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("No teams yet", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No teams yet", fontSize = screenConfig.titleTextSize, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Tap + to add teams", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
             }
         }

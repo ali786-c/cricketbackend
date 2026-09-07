@@ -22,7 +22,7 @@ import javax.inject.Singleton
 class TournamentAdminRepository @Inject constructor(
     private val apiService: ApiService
 ) {
-    private fun authHeader(token: String?) = token ?: ""
+    private fun authHeader(token: String?) = if (!token.isNullOrBlank()) { if (token.startsWith("Bearer")) token else "Bearer $token" } else ""
 
     // ─── Tournament CRUD ───────────────────────────────────
 

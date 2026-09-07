@@ -6,6 +6,7 @@ import com.devwithguru.cricket.data.mapper.toDomain
 import com.devwithguru.cricket.data.mapper.toEntity
 import com.devwithguru.cricket.data.mapper.toScheduledDomain
 import com.devwithguru.cricket.data.sync.SyncManager
+import com.devwithguru.cricket.data.api.ApiService
 import com.devwithguru.cricket.domain.model.Fixture
 import com.devwithguru.cricket.domain.model.ScheduledFixture
 import com.google.gson.Gson
@@ -27,7 +28,8 @@ class FixtureRepository @Inject constructor(
     private val adminFixtureDao: AdminFixtureDao,
     private val fixtureDao: com.devwithguru.cricket.data.db.dao.FixtureDao,
     private val syncManager: SyncManager,
-    private val tournamentDao: com.devwithguru.cricket.data.db.dao.TournamentDao
+    private val tournamentDao: com.devwithguru.cricket.data.db.dao.TournamentDao,
+    private val apiService: com.devwithguru.cricket.data.api.ApiService
 ) {
     /**
      * Get all fixtures for a tournament (Flow)
@@ -187,6 +189,29 @@ class FixtureRepository @Inject constructor(
         }
     }
 
+    /** 
+     * Create an operational match from a fixture — server-side match creation
+     */
+    suspend fun createMatchFromFixture(
+        tournamentId: String,
+        fixtureId: String,
+        token: String
+    ): Result<com.devwithguru.cricket.data.api.CreateMatchFromFixtureData> {
+        return try {
+            val authHeader = "Bearer $token"
+            val response = apiService.createMatchFromFixture(authHeader, tournamentId, fixtureId)
+            if (response.isSuccessful) {
+                val data = response.body()?.data
+                if (data != null) Result.success(data)
+                else Result.failure(Exception("No data"))
+            } else {
+                Result.failure(Exception(response.errorBody()?.string() ?: "Failed to create match"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /**
      * Get fixture count for a tournament
      */
@@ -209,14 +234,16 @@ class FixtureRepository @Inject constructor(
             return entity.toScheduledDomain()
         }
         val adminEntity = adminFixtureDao.findById(resolvedId) ?: return null
+        val tournament = tournamentDao.findById(adminEntity.tournamentId)
+        val defaultOvers = tournament?.oversPerInnings ?: 20
         return com.devwithguru.cricket.domain.model.ScheduledFixture(
             id = adminEntity.id,
             homeTeam = adminEntity.homeTeamName,
             awayTeam = adminEntity.awayTeamName,
-            overs = 20,
-            ballType = "Tennis",
+            overs = defaultOvers,
+            ballType = tournament?.ballType ?: "Tennis",
             matchType = adminEntity.matchType,
-            wickets = 10,
+            wickets = tournament?.wicketsPerTeam ?: 10,
             venue = adminEntity.venue ?: "",
             date = adminEntity.scheduledDate ?: "",
             time = adminEntity.scheduledTime ?: "",

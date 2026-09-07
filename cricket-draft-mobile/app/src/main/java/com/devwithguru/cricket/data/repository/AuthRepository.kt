@@ -2,6 +2,8 @@ package com.devwithguru.cricket.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.devwithguru.cricket.data.api.ApiService
 import com.devwithguru.cricket.data.api.LoginRequest
 import com.devwithguru.cricket.data.api.LoginResponse
@@ -12,6 +14,9 @@ import javax.inject.Singleton
 
 /**
  * Handles authentication: login, logout, token storage, profile updates.
+ *
+ * Uses EncryptedSharedPreferences for secure token storage (AES-256 encryption).
+ * Falls back to regular SharedPreferences if encryption setup fails (e.g., no hardware keystore).
  */
 @Singleton
 class AuthRepository @Inject constructor(
@@ -19,7 +24,27 @@ class AuthRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        createEncryptedPrefs()
+    }
+
+    private fun createEncryptedPrefs(): SharedPreferences {
+        return try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            // Fallback to regular SharedPreferences if encryption fails
+            // (e.g., on devices without hardware keystore)
+            context.getSharedPreferences("${PREFS_NAME}_fallback", Context.MODE_PRIVATE)
+        }
     }
 
     // ─── Token Management ──────────────────────────────────

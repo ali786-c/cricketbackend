@@ -82,10 +82,18 @@ data class MatchScoringState(
         }
 
     val formattedOvers: String
-        get() = "${totalBalls / ballsPerOver}.${totalBalls % ballsPerOver}"
+        get() {
+            val overs = totalBalls / ballsPerOver
+            val balls = totalBalls % ballsPerOver
+            return if (balls == 0 && overs > 0) "${overs}.0" else "$overs.$balls"
+        }
 
     val formattedBowlerOvers: String
-        get() = "${bowler.balls / ballsPerOver}.${bowler.balls % ballsPerOver}"
+        get() {
+            val overs = bowler.balls / ballsPerOver
+            val balls = bowler.balls % ballsPerOver
+            return if (balls == 0 && overs > 0) "${overs}.0" else "$overs.$balls"
+        }
 
     val runRateStr: String
         get() {

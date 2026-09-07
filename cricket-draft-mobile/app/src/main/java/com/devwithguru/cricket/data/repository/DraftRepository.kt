@@ -4,7 +4,9 @@ import com.devwithguru.cricket.data.api.AdminSelectPlayerRequest
 import com.devwithguru.cricket.data.api.ApiService
 import com.devwithguru.cricket.data.api.CaptainPickRequest
 import com.devwithguru.cricket.data.api.DraftStateData
+import com.devwithguru.cricket.data.api.DraftSetupRequest
 import com.devwithguru.cricket.data.api.ExtendTimerRequest
+import com.devwithguru.cricket.data.api.SimpleMessageResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,7 +17,7 @@ import javax.inject.Singleton
 class DraftRepository @Inject constructor(
     private val apiService: ApiService
 ) {
-    private fun authHeader(token: String) = "Bearer $token"
+    private fun authHeader(token: String) = if (token.startsWith("Bearer")) token else "Bearer $token"
 
     // ─── Draft State ───────────────────────────────────────
 

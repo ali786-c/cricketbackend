@@ -26,6 +26,12 @@ interface TournamentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTournament(tournament: TournamentEntity): Long
 
+    @Query("SELECT * FROM tournaments WHERE serverId = :serverId LIMIT 1")
+    suspend fun findByServerId(serverId: Int): TournamentEntity?
+
+    @Query("UPDATE tournaments SET serverId = :serverId, updatedAt = :updatedAt WHERE id = :localId")
+    suspend fun updateServerId(localId: String, serverId: Int, updatedAt: Long = System.currentTimeMillis())
+
     @Update
     suspend fun updateTournament(tournament: TournamentEntity)
 

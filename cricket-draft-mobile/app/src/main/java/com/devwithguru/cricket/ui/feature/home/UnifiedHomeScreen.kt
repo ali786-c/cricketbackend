@@ -33,6 +33,8 @@ import androidx.compose.runtime.getValue
 import com.devwithguru.cricket.ui.feature.player.PlayerMatchesViewModel
 import com.devwithguru.cricket.ui.feature.player.PlayerProfileViewModel
 import kotlinx.coroutines.launch
+import com.devwithguru.cricket.ui.theme.screenConfig
+import com.devwithguru.cricket.ui.viewmodels.SearchViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +43,7 @@ fun UnifiedHomeScreen(
     isDarkTheme: Boolean = false,
     onToggleTheme: (Boolean) -> Unit = {},
     viewModel: PlayerMatchesViewModel = hiltViewModel(),
-    profileViewModel: PlayerProfileViewModel = hiltViewModel(),
+    tournamentViewModel: com.devwithguru.cricket.ui.feature.tournament.TournamentViewModel = hiltViewModel(),
     onNavigateToCreateMatch: () -> Unit,
     onNavigateToCreateTournament: () -> Unit,
     onNavigateToMyTournaments: () -> Unit,
@@ -51,14 +53,13 @@ fun UnifiedHomeScreen(
     onNavigateToMatchCenter: (matchId: String) -> Unit,
     onNavigateToRecentMatches: () -> Unit,
     onSearchClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    searchViewModel: SearchViewModel = hiltViewModel()
 ) {
-    var searchQuery by remember { mutableStateOf("") }
     var activeTab by remember { mutableStateOf("Hub") }
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
-    // Load current user's profile stats for the profile card
-    LaunchedEffect(Unit) { profileViewModel.loadPlayer("p1") }
-    val profileStats by profileViewModel.stats.collectAsState()
+    LaunchedEffect(Unit) { tournamentViewModel.loadAllTournaments() }
+    val tournaments by tournamentViewModel.tournaments.collectAsState()
     val liveFixtures by viewModel.fixtures.collectAsState()
     val pagerState = rememberPagerState(pageCount = { maxOf(liveFixtures.size, 1) })
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -93,7 +94,7 @@ fun UnifiedHomeScreen(
                             )
                             Text(
                                 text = "STUMPS",
-                                fontSize = 28.sp,
+                                fontSize = screenConfig.displayTextSize,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -239,7 +240,7 @@ fun UnifiedHomeScreen(
                             )
                             Text(
                                 text = "STUMPS",
-                                fontSize = 21.sp,
+                                fontSize = screenConfig.headingTextSize,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
                                 letterSpacing = (-0.8).sp
@@ -263,6 +264,14 @@ fun UnifiedHomeScreen(
                                 Icons.Filled.Search,
                                 contentDescription = "Search",
                                 tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = { searchViewModel.clearSearch() }) {
+                            Icon(
+                                Icons.Filled.Clear,
+                                contentDescription = "Clear Search",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     },
@@ -291,7 +300,7 @@ fun UnifiedHomeScreen(
                 ) {
                     Text(
                         text = "Matches",
-                        fontSize = 16.sp,
+                        fontSize = screenConfig.titleTextSize,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = (-0.3).sp,
                         color = MaterialTheme.colorScheme.onBackground
@@ -299,7 +308,7 @@ fun UnifiedHomeScreen(
                     IconButton(onClick = onNavigateToRecentMatches) {
                         Text(
                             text = "»",
-                            fontSize = 26.sp,
+                            fontSize = screenConfig.displayTextSize,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -360,28 +369,7 @@ fun UnifiedHomeScreen(
                 }
             }
 
-            // Section 2: Profile Header & Quick Access Card
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Profile",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.3).sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                MyProfileQuickAccessCard(
-                    playerName = userName.split("@").first().capitalize(),
-                    role = "Player",
-                    matches = profileStats?.matches?.toString() ?: "--",
-                    runs = profileStats?.runs?.toString() ?: "--",
-                    wickets = profileStats?.wickets?.toString() ?: "--",
-                    rating = 0f,
-                    onClick = onNavigateToPlayerProfile
-                )
-            }
-
-            // Section 3: Quick Actions
+            // Section 2: Quick Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -442,7 +430,7 @@ fun UnifiedHomeScreen(
                 }
             }
 
-            // Section 4: Active Campaigns (Tournaments)
+            // Section 3: Active Campaigns (Tournaments)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -451,7 +439,7 @@ fun UnifiedHomeScreen(
                 ) {
                     Text(
                         text = "Active Campaigns",
-                        fontSize = 16.sp,
+                        fontSize = screenConfig.titleTextSize,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = (-0.3).sp,
                         color = MaterialTheme.colorScheme.onBackground
@@ -468,24 +456,29 @@ fun UnifiedHomeScreen(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TournamentItemCard(
-                        title = "Summer Smash '24",
-                        subtitle = "Quarter Finals • 8 Teams",
-                        icon = Icons.Default.EmojiEvents,
-                        onClick = { onNavigateToTournamentHub("summer-smash-24") }
-                    )
-
-                    TournamentItemCard(
-                        title = "Corporate Cup",
-                        subtitle = "Registration Open",
-                        icon = Icons.Filled.EditCalendar,
-                        highlightPrimary = true,
-                        onClick = { onNavigateToTournamentHub("corporate-cup") }
-                    )
+                    if (tournaments.isNotEmpty()) {
+                        tournaments.take(3).forEach { tournament ->
+                            TournamentItemCard(
+                                title = tournament.name,
+                                subtitle = "${tournament.teamCount} Teams • ${tournament.city}",
+                                icon = Icons.Default.EmojiEvents,
+                                highlightPrimary = true,
+                                onClick = { onNavigateToTournamentHub(tournament.id) }
+                            )
+                        }
+                    } else {
+                        TournamentItemCard(
+                            title = "No Active Campaigns",
+                            subtitle = "Create a tournament to get started",
+                            icon = Icons.Filled.EditCalendar,
+                            highlightPrimary = false,
+                            onClick = { onNavigateToCreateTournament() }
+                        )
+                    }
                 }
             }
 
-            // Section 5: Directory (Bento Bottom Grid)
+            // Section 4: Directory (Bento Bottom Grid)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -574,7 +567,7 @@ fun LiveMatchCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(scoreA, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Text(scoreA, fontSize = screenConfig.scoreTextSize, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -594,7 +587,7 @@ fun LiveMatchCard(
                 Text("v", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(scoreB, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    Text(scoreB, fontSize = screenConfig.scoreTextSize, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -687,7 +680,7 @@ fun UpcomingMatchCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TeamAvatarCircle(teamA)
-                Text("vs", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+                Text("vs", fontSize = screenConfig.bodyTextSize, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
                 TeamAvatarCircle(teamB)
             }
         }
@@ -782,7 +775,7 @@ fun MyProfileQuickAccessCard(
                     )
                     Text(
                         text = matches,
-                        fontSize = 20.sp,
+                        fontSize = screenConfig.scoreTextSize,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         letterSpacing = (-0.4).sp
@@ -801,7 +794,7 @@ fun MyProfileQuickAccessCard(
                     )
                     Text(
                         text = runs,
-                        fontSize = 20.sp,
+                        fontSize = screenConfig.scoreTextSize,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         letterSpacing = (-0.4).sp
@@ -820,7 +813,7 @@ fun MyProfileQuickAccessCard(
                     )
                     Text(
                         text = wickets,
-                        fontSize = 20.sp,
+                        fontSize = screenConfig.scoreTextSize,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         letterSpacing = (-0.4).sp
@@ -857,7 +850,7 @@ fun StatsMiniBox(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
-                fontSize = 20.sp,
+                fontSize = screenConfig.scoreTextSize,
                 fontWeight = FontWeight.Bold,
                 color = if (highlightGreen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,7 +138,7 @@ fun TossScreen(
                     1 -> {
                         Text(
                             text = "Who won the toss?",
-                            fontSize = 20.sp,
+                            fontSize = screenConfig.scoreTextSize,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground,
                             textAlign = TextAlign.Center
@@ -194,7 +195,7 @@ fun TossScreen(
                     2 -> {
                         Text(
                             text = "$selectedWinner elected to?",
-                            fontSize = 20.sp,
+                            fontSize = screenConfig.scoreTextSize,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground,
                             textAlign = TextAlign.Center
@@ -338,7 +339,7 @@ fun TossScreen(
                             ) {
                                 Text(
                                     text = selectedWinner.take(2).uppercase(),
-                                    fontSize = 28.sp,
+                                    fontSize = screenConfig.displayTextSize,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = Color(0xFF3E2723)
                                 )
@@ -348,7 +349,7 @@ fun TossScreen(
 
                             Text(
                                 text = "$selectedWinner won the toss!",
-                                fontSize = 22.sp,
+                                fontSize = screenConfig.headingTextSize,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center
@@ -508,7 +509,7 @@ private fun DecisionCard(
         ) {
             Text(
                 text = emoji,
-                fontSize = 40.sp
+                fontSize = screenConfig.displayTextSize
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(

@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @Composable
 fun SelectNextBowlerDialog(
@@ -31,7 +32,7 @@ fun SelectNextBowlerDialog(
             title = {
                 Text(
                     text = "Select Next Bowler",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -85,7 +86,7 @@ fun SelectNextBatsmanDialog(
             title = {
                 Text(
                     text = "Select Next Batsman",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -298,7 +299,7 @@ fun DismissalPickerView(
         ) {
             Text(
                 text = "Record Wicket 🏏",
-                fontSize = 16.sp,
+                fontSize = screenConfig.headingTextSize,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -414,7 +415,7 @@ fun FielderSelectorView(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Text("←", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("←", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = screenConfig.headingTextSize)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -505,7 +506,7 @@ fun RunOutConfigView(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Run Out Details 🏃‍♂️",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )

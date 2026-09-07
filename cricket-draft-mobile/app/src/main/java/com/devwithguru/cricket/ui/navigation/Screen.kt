@@ -4,9 +4,10 @@ sealed interface Screen {
     object Login : Screen
     object Onboarding : Screen
     object Home : Screen
-    data class CreateMatch(val tournamentId: String? = null) : Screen
+    data class CreateMatch(val tournamentId: String? = null, val defaultWickets: Int = 10) : Screen
     object CreateTournament : Screen
     object MyTournaments : Screen
+    object MyTeams : Screen
     data class AddTeam(val tournamentId: String) : Screen
     data class CreateStage(val tournamentId: String, val stageNumber: Int = 1) : Screen
     data class ScheduleMatch(val tournamentId: String) : Screen

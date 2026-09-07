@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerScreen
+import com.devwithguru.cricket.ui.theme.screenConfig
 import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerViewModel
 import com.devwithguru.cricket.ui.feature.match.viewmodels.MatchCenterViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -64,13 +65,18 @@ fun MatchCenterScreen(
     onNavigateToMatchEditor: () -> Unit = {},
     onDeclareInnings: (runs: Int, wickets: Int, overs: String) -> Unit = { _, _, _ -> },
     matchCenterViewModel: MatchCenterViewModel = hiltViewModel(),
-    scorerViewModel: LiveScorerViewModel = remember { LiveScorerViewModel() }
+    scorerViewModel: LiveScorerViewModel = hiltViewModel()
 ) {
     LaunchedEffect(matchId) { matchCenterViewModel.loadFixture(matchId) }
     val activeFixture by matchCenterViewModel.fixture.collectAsState()
-    var currentInnings by remember { mutableStateOf(activeFixture?.currentInnings ?: 1) }
-    var firstInningsTargetScore by remember { mutableStateOf(activeFixture?.firstInningsRuns?.plus(1)) }
+    var currentInnings by remember(activeFixture?.id, activeFixture?.currentInnings) {
+        mutableStateOf(activeFixture?.currentInnings ?: 1)
+    }
+    var firstInningsTargetScore by remember(activeFixture?.id, activeFixture?.firstInningsRuns) {
+        mutableStateOf(activeFixture?.firstInningsRuns?.let { if (it > 0) it + 1 else null })
+    }
     var selectedTab by remember { mutableStateOf(0) }
+    LaunchedEffect(isScorer) { selectedTab = 0 }
 
     val scoringTab = stringResource(R.string.tab_scoring)
     val scorecardTab = stringResource(R.string.tab_scorecard)
@@ -96,13 +102,13 @@ fun MatchCenterScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = stringResource(R.string.match_center_title),
-                            fontSize = 16.sp,
+                            fontSize = screenConfig.titleTextSize,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "$homeTeam vs $awayTeam",
-                            fontSize = 11.sp,
+                            fontSize = screenConfig.captionTextSize,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
@@ -147,8 +153,16 @@ fun MatchCenterScreen(
                     )
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                ScrollableTabRow(
+            if (activeFixture == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -162,7 +176,7 @@ fun MatchCenterScreen(
                             text = {
                                 Text(
                                     text = title,
-                                    fontSize = 13.sp,
+                                    fontSize = screenConfig.bodyTextSize,
                                     fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -184,81 +198,119 @@ fun MatchCenterScreen(
                                 val battingTeam = if (isFixtureInnings2) activeFixture?.awayTeam ?: awayTeam else activeFixture?.homeTeam ?: homeTeam
                                 val bowlingTeam = if (isFixtureInnings2) activeFixture?.homeTeam ?: homeTeam else activeFixture?.awayTeam ?: awayTeam
 
+                                val fHomeSquad = activeFixture?.homeSquad?.takeIf { it.isNotEmpty() } ?: homeSquadList
+                                val fAwaySquad = activeFixture?.awaySquad?.takeIf { it.isNotEmpty() } ?: awaySquadList
+
+                                val dbInningsMatches = activeFixture?.currentInnings == currentInnings
+
                                 LiveScorerScreen(
                                     homeTeamName = battingTeam,
                                     awayTeamName = bowlingTeam,
-                                    homeSquadList = if (isFixtureInnings2) awaySquadList else homeSquadList,
-                                    awaySquadList = if (isFixtureInnings2) homeSquadList else awaySquadList,
+                                    homeSquadList = if (isFixtureInnings2) fAwaySquad else fHomeSquad,
+                                    awaySquadList = if (isFixtureInnings2) fHomeSquad else fAwaySquad,
                                     ballsPerOver = 6,
-                                    initialRuns = activeFixture?.currentRuns ?: 0,
-                                    initialWickets = activeFixture?.currentWickets ?: 0,
-                                    initialOversBowled = activeFixture?.oversBowled ?: "0.0",
-                                    initialStrikerName = activeFixture?.strikerName ?: "",
-                                    initialNonStrikerName = activeFixture?.nonStrikerName ?: "",
-                                    initialBowlerName = activeFixture?.bowlerName ?: "",
-                                    initialBatsmenStats = if (isFixtureInnings2) activeFixture?.secondInningsBatsmen ?: emptyList() else activeFixture?.firstInningsBatsmen ?: emptyList(),
-                                    initialBowlersStats = if (isFixtureInnings2) activeFixture?.secondInningsBowlers ?: emptyList() else activeFixture?.firstInningsBowlers ?: emptyList(),
-                                    initialFOW = if (isFixtureInnings2) activeFixture?.secondInningsFOW ?: emptyList() else activeFixture?.firstInningsFOW ?: emptyList(),
-                                    initialPartnerships = if (isFixtureInnings2) activeFixture?.secondInningsPartnerships ?: emptyList() else activeFixture?.firstInningsPartnerships ?: emptyList(),
-                                    initialActivePartnershipRuns = activeFixture?.activePartnershipRuns ?: 0,
-                                    initialActivePartnershipBalls = activeFixture?.activePartnershipBalls ?: 0,
+                                    initialRuns = if (dbInningsMatches) activeFixture?.currentRuns ?: 0 else 0,
+                                    initialWickets = if (dbInningsMatches) activeFixture?.currentWickets ?: 0 else 0,
+                                    initialOversBowled = if (dbInningsMatches) activeFixture?.oversBowled ?: "0.0" else "0.0",
+                                    initialStrikerName = if (dbInningsMatches) activeFixture?.strikerName ?: "" else "",
+                                    initialNonStrikerName = if (dbInningsMatches) activeFixture?.nonStrikerName ?: "" else "",
+                                    initialBowlerName = if (dbInningsMatches) activeFixture?.bowlerName ?: "" else "",
+                                    initialBatsmenStats = if (dbInningsMatches) {
+                                        if (isFixtureInnings2) activeFixture?.secondInningsBatsmen ?: emptyList() else activeFixture?.firstInningsBatsmen ?: emptyList()
+                                    } else emptyList(),
+                                    initialBowlersStats = if (dbInningsMatches) {
+                                        if (isFixtureInnings2) activeFixture?.secondInningsBowlers ?: emptyList() else activeFixture?.firstInningsBowlers ?: emptyList()
+                                    } else emptyList(),
+                                    initialFOW = if (dbInningsMatches) {
+                                        if (isFixtureInnings2) activeFixture?.secondInningsFOW ?: emptyList() else activeFixture?.firstInningsFOW ?: emptyList()
+                                    } else emptyList(),
+                                    initialPartnerships = if (dbInningsMatches) {
+                                        if (isFixtureInnings2) activeFixture?.secondInningsPartnerships ?: emptyList() else activeFixture?.firstInningsPartnerships ?: emptyList()
+                                    } else emptyList(),
+                                    initialActivePartnershipRuns = if (dbInningsMatches) activeFixture?.activePartnershipRuns ?: 0 else 0,
+                                    initialActivePartnershipBalls = if (dbInningsMatches) activeFixture?.activePartnershipBalls ?: 0 else 0,
                                     isInnings2 = isFixtureInnings2,
                                     firstInningsTarget = firstInningsTargetScore,
                                     matchTotalOvers = activeFixture?.overs ?: 6,
                                     matchTotalWickets = activeFixture?.wickets ?: 10,
                                     onDeclareInnings = { runs, wickets, overs ->
-                                        activeFixture?.let { f ->
-                                             if (f.currentInnings == 1) {
-                                                 f.firstInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList()
-                                                 f.firstInningsBowlers = scorerViewModel.state.bowlersStats.values.toList()
-                                                 f.firstInningsExtras = scorerViewModel.state.extras
-                                                 f.firstInningsDotBalls = scorerViewModel.state.dotBalls
-                                                 f.firstInningsFOW = scorerViewModel.state.fallOfWickets
-                                                 f.firstInningsPartnerships = scorerViewModel.state.partnerships
-
-                                                 currentInnings = 2
-                                                 firstInningsTargetScore = runs + 1
-                                             } else {
-                                                 f.secondInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList()
-                                                 f.secondInningsBowlers = scorerViewModel.state.bowlersStats.values.toList()
-                                                 f.secondInningsExtras = scorerViewModel.state.extras
-                                                 f.secondInningsDotBalls = scorerViewModel.state.dotBalls
-                                                 f.secondInningsFOW = scorerViewModel.state.fallOfWickets
-                                                 f.secondInningsPartnerships = scorerViewModel.state.partnerships
-                                             }
-                                             // Persist scoring data to Room via MatchCenterViewModel
-                                             matchCenterViewModel.updateFixture(f)
-                                        }
-                                        onDeclareInnings(runs, wickets, overs)
+                                         activeFixture?.let { f ->
+                                              val updated = if (f.currentInnings == 1) {
+                                                  f.copy(
+                                                      firstInningsRuns = runs,
+                                                      firstInningsWickets = wickets,
+                                                      firstInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList(),
+                                                      firstInningsBowlers = scorerViewModel.state.bowlersStats.values.toList(),
+                                                      firstInningsExtras = scorerViewModel.state.extras,
+                                                      firstInningsDotBalls = scorerViewModel.state.dotBalls,
+                                                      firstInningsFOW = scorerViewModel.state.fallOfWickets,
+                                                      firstInningsPartnerships = scorerViewModel.state.partnerships,
+                                                      currentInnings = 2,
+                                                      currentRuns = 0,
+                                                      currentWickets = 0,
+                                                      oversBowled = "0.0",
+                                                      strikerName = "",
+                                                      nonStrikerName = "",
+                                                      bowlerName = ""
+                                                  )
+                                              } else {
+                                                  f.copy(
+                                                      secondInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList(),
+                                                      secondInningsBowlers = scorerViewModel.state.bowlersStats.values.toList(),
+                                                      secondInningsExtras = scorerViewModel.state.extras,
+                                                      secondInningsDotBalls = scorerViewModel.state.dotBalls,
+                                                      secondInningsFOW = scorerViewModel.state.fallOfWickets,
+                                                      secondInningsPartnerships = scorerViewModel.state.partnerships,
+                                                      status = "Completed"
+                                                  )
+                                              }
+                                              currentInnings = updated.currentInnings
+                                              if (updated.currentInnings == 2) {
+                                                  firstInningsTargetScore = runs + 1
+                                              }
+                                              matchCenterViewModel.updateFixture(updated)
+                                         }
+                                         onDeclareInnings(runs, wickets, overs)
                                     },
                                     onNavigateToMatchEditor = onNavigateToMatchEditor,
                                     onNavigateBack = onNavigateBack,
                                     viewModel = scorerViewModel,
                                     onScoreChanged = { runs, wickets, overs, striker, nonStriker ->
                                         activeFixture?.let { f ->
-                                            f.currentRuns = runs
-                                            f.currentWickets = wickets
-                                            f.oversBowled = overs
-                                            f.strikerName = striker
-                                            f.nonStrikerName = nonStriker
-                                            f.bowlerName = scorerViewModel.state.bowler.name
-                                            f.activePartnershipRuns = scorerViewModel.state.activePartnershipRuns
-                                            f.activePartnershipBalls = scorerViewModel.state.activePartnershipBalls
-
-                                            if (f.currentInnings == 1) {
-                                                f.firstInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList()
-                                                f.firstInningsBowlers = scorerViewModel.state.bowlersStats.values.toList()
-                                                f.firstInningsFOW = scorerViewModel.state.fallOfWickets
-                                                f.firstInningsPartnerships = scorerViewModel.state.partnerships
+                                            val updated = if (f.currentInnings == 1) {
+                                                f.copy(
+                                                    currentRuns = runs,
+                                                    currentWickets = wickets,
+                                                    oversBowled = overs,
+                                                    strikerName = striker,
+                                                    nonStrikerName = nonStriker,
+                                                    bowlerName = scorerViewModel.state.bowler.name,
+                                                    activePartnershipRuns = scorerViewModel.state.activePartnershipRuns,
+                                                    activePartnershipBalls = scorerViewModel.state.activePartnershipBalls,
+                                                    firstInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList(),
+                                                    firstInningsBowlers = scorerViewModel.state.bowlersStats.values.toList(),
+                                                    firstInningsFOW = scorerViewModel.state.fallOfWickets,
+                                                    firstInningsPartnerships = scorerViewModel.state.partnerships
+                                                )
                                             } else {
-                                                f.secondInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList()
-                                                f.secondInningsBowlers = scorerViewModel.state.bowlersStats.values.toList()
-                                                f.secondInningsFOW = scorerViewModel.state.fallOfWickets
-                                                f.secondInningsPartnerships = scorerViewModel.state.partnerships
+                                                f.copy(
+                                                    currentRuns = runs,
+                                                    currentWickets = wickets,
+                                                    oversBowled = overs,
+                                                    strikerName = striker,
+                                                    nonStrikerName = nonStriker,
+                                                    bowlerName = scorerViewModel.state.bowler.name,
+                                                    activePartnershipRuns = scorerViewModel.state.activePartnershipRuns,
+                                                    activePartnershipBalls = scorerViewModel.state.activePartnershipBalls,
+                                                    secondInningsBatsmen = scorerViewModel.state.batsmenStats.values.toList(),
+                                                    secondInningsBowlers = scorerViewModel.state.bowlersStats.values.toList(),
+                                                    secondInningsFOW = scorerViewModel.state.fallOfWickets,
+                                                    secondInningsPartnerships = scorerViewModel.state.partnerships
+                                                )
                                             }
+                                            matchCenterViewModel.updateFixture(updated)
                                         }
-                                    }
-                                )
+                                    })
                             } else {
                                 MatchSummaryTab(homeTeam, awayTeam, activeFixture)
                             }
@@ -268,6 +320,7 @@ fun MatchCenterScreen(
                         3 -> MatchSuperStarsTab(matchId = matchId, viewModel = scorerViewModel, activeFixture = activeFixture)
                     }
                 }
+            }
             }
         }
     }
@@ -290,7 +343,7 @@ fun MatchStatCompareBar(
         Text(
             text = label,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp,
+            fontSize = screenConfig.captionTextSize,
             fontWeight = FontWeight.Bold
         )
 
@@ -298,8 +351,8 @@ fun MatchStatCompareBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = homeVal, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(text = awayVal, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(text = homeVal, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = screenConfig.bodyTextSize)
+            Text(text = awayVal, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = screenConfig.bodyTextSize)
         }
 
         // Custom comparison progress bar using dynamic weights
@@ -327,8 +380,8 @@ fun MatchStatCompareBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = homeTeam, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
-            Text(text = awayTeam, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+            Text(text = homeTeam, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+            Text(text = awayTeam, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
         }
     }
 }

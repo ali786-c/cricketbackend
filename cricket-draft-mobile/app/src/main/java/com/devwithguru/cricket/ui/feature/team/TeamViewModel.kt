@@ -15,11 +15,13 @@ import com.devwithguru.cricket.domain.model.Fixture
 import com.devwithguru.cricket.domain.model.Tournament
 import com.devwithguru.cricket.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
 import javax.inject.Inject
 
 @HiltViewModel
@@ -60,6 +62,12 @@ class TeamViewModel @Inject constructor(
     private val _isCreator = MutableStateFlow(false)
     val isCreator: StateFlow<Boolean> = _isCreator
 
+    // Jobs for cancelling previous coroutine collections when switching teams
+    private var squadJob: Job? = null
+    private var fixturesJob: Job? = null
+    private var teamInfoJob: Job? = null
+    private var apiRefreshJob: Job? = null
+
     init {
         loadAllRegisteredPlayers()
     }
@@ -76,9 +84,11 @@ class TeamViewModel @Inject constructor(
      * Load all teams from Room (always works offline).
      */
     fun loadAllTeams() {
+        _isLoading.value = true
         viewModelScope.launch {
             teamRepository.getAllTeams().collect {
                 _teams.value = it
+                _isLoading.value = false
             }
         }
     }
@@ -100,8 +110,16 @@ class TeamViewModel @Inject constructor(
      * 2. Background API refresh for squad
      */
     fun loadTeam(idStr: String) {
+        _isLoading.value = true
+
+        // Cancel ALL previous coroutine collections to prevent data leaking between teams
+        teamInfoJob?.cancel()
+        fixturesJob?.cancel()
+        squadJob?.cancel()
+        apiRefreshJob?.cancel()
+
         // Step 1: Show Room data immediately
-        viewModelScope.launch {
+        teamInfoJob = viewModelScope.launch {
             val id = teamRepository.resolveOriginalTeamId(idStr)
             updateLocalPlayerCount(id)
             val team = teamRepository.getTeamById(id)
@@ -123,15 +141,26 @@ class TeamViewModel @Inject constructor(
         }
 
         // Observe team matches
-        viewModelScope.launch {
+        fixturesJob = viewModelScope.launch {
             val id = teamRepository.resolveOriginalTeamId(idStr)
             fixtureRepository.getFixturesByTeam(id).collect { list ->
-                _fixtures.value = list
+                val mappedList = list.map { f ->
+                    val scoredFixture = fixtureRepository.getScheduledFixtureById(f.id)
+                    f.copy(
+                        currentInnings = scoredFixture?.currentInnings,
+                        currentRuns = scoredFixture?.currentRuns,
+                        currentWickets = scoredFixture?.currentWickets,
+                        oversBowled = scoredFixture?.oversBowled,
+                        firstInningsRuns = scoredFixture?.firstInningsRuns,
+                        firstInningsWickets = scoredFixture?.firstInningsWickets
+                    )
+                }
+                _fixtures.value = mappedList
             }
         }
 
         // Step 1.5: Observe local squad players for this team and combine with team updates (for designations)
-        viewModelScope.launch {
+        squadJob = viewModelScope.launch {
             val id = teamRepository.resolveOriginalTeamId(idStr)
             combine(
                 playerRepository.getPlayersByTeam(id),
@@ -153,7 +182,7 @@ class TeamViewModel @Inject constructor(
         }
 
         // Step 2: Background API refresh
-        viewModelScope.launch {
+        apiRefreshJob = viewModelScope.launch {
             val id = teamRepository.resolveOriginalTeamId(idStr)
             try {
                 val result = teamApiRepository.getTeamPlayers(id)
@@ -165,6 +194,8 @@ class TeamViewModel @Inject constructor(
                 }
             } catch (_: Exception) {
                 // Offline — Room data already showing
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -212,6 +243,20 @@ class TeamViewModel @Inject constructor(
         viewModelScope.launch {
             val teamId = teamRepository.resolveOriginalTeamId(teamIdStr)
             val resolvedId = resolveOriginalPlayerId(playerId)
+            
+            // Validate: prevent joining another team in the SAME tournament
+            val targetTeam = teamRepository.getTeamById(teamId)
+            if (targetTeam != null) {
+                val player = playerRepository.findById(resolvedId)
+                if (player?.teamId != null && player.teamId != teamId) {
+                    val currentTeam = teamRepository.getTeamById(player.teamId)
+                    if (currentTeam != null && currentTeam.tournamentId == targetTeam.tournamentId) {
+                        _error.value = "Player is already registered in another team (${currentTeam.name}) in this tournament."
+                        return@launch
+                    }
+                }
+            }
+
             playerRepository.assignPlayerToTeam(resolvedId, teamId)
             updateLocalPlayerCount(teamId)
         }
@@ -292,5 +337,9 @@ class TeamViewModel @Inject constructor(
             teamRepository.saveTeam(team)
             _currentTeam.value = team
         }
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 }

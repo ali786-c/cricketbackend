@@ -70,6 +70,7 @@ object DatabaseModule {
     @Provides fun provideTeamDao(db: CricketDatabase): TeamDao = db.teamDao()
     @Provides fun provideSyncStatusDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.SyncStatusDao = db.syncStatusDao()
     @Provides fun providePendingChangeDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.PendingChangeDao = db.pendingChangeDao()
+    @Provides fun providePendingDeliveryDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.PendingDeliveryDao = db.pendingDeliveryDao()
     @Provides fun provideAdminTeamDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminTeamDao = db.adminTeamDao()
     @Provides fun provideAdminPlayerDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminPlayerDao = db.adminPlayerDao()
     @Provides fun provideAdminFixtureDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminFixtureDao = db.adminFixtureDao()

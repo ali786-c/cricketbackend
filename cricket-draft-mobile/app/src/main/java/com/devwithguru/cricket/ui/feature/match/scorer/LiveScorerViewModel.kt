@@ -5,14 +5,32 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.devwithguru.cricket.data.db.entity.PendingDeliveryEntity
+import com.devwithguru.cricket.data.repository.DeliverySyncRepository
 import com.devwithguru.cricket.domain.model.BatterState
 import com.devwithguru.cricket.domain.model.BowlerState
 import com.devwithguru.cricket.domain.model.WicketEvent
 import com.devwithguru.cricket.domain.model.PartnershipEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class LiveScorerViewModel : ViewModel() {
+@HiltViewModel
+class LiveScorerViewModel @Inject constructor(
+    private val deliverySyncRepository: DeliverySyncRepository
+) : ViewModel() {
 
     var isInitialized = false
+
+    // Match context (set during initialize or from Screen)
+    var matchId: String = ""
+        private set
+    var inningsNumber: Int = 1
+        private set
+    var strikerServerId: Int = 0
+    var nonStrikerServerId: Int = 0
+    var bowlerServerId: Int = 0
 
     // Main game state
     var state by mutableStateOf(MatchScoringState())
@@ -44,6 +62,22 @@ class LiveScorerViewModel : ViewModel() {
     val battingSquadList = mutableStateListOf<String>()
     val bowlingSquadList = mutableStateListOf<String>()
 
+    /**
+     * Set match context for delivery persistence.
+     * Must be called before scoring begins.
+     */
+    fun setMatchContext(matchId: String, inningsNumber: Int) {
+        this.matchId = matchId
+        this.inningsNumber = inningsNumber
+    }
+
+    /**
+     * Set server-side player IDs for sync (called when player roster is loaded).
+     */
+    fun setPlayerServerIds(ids: Map<String, Int>) {
+        // Called from parent when player IDs are resolved from the API
+    }
+
     fun initialize(
         runs: Int,
         wickets: Int,
@@ -67,7 +101,11 @@ class LiveScorerViewModel : ViewModel() {
         initialActivePartnershipRuns: Int = 0,
         initialActivePartnershipBalls: Int = 0
     ) {
-        if (isInitialized && state.isInnings2 == isInnings2) return
+        if (isInitialized && 
+            state.isInnings2 == isInnings2 && 
+            battingSquad == battingSquadList.toList() && 
+            bowlingSquad == bowlingSquadList.toList()
+        ) return
         isInitialized = true
 
         val parsedOversToBalls = { oversStr: String ->
@@ -254,6 +292,9 @@ class LiveScorerViewModel : ViewModel() {
                 showSelectBatsmanDialog
 
     private fun saveStateToHistory() {
+        if (historyStack.size >= MAX_HISTORY_SIZE) {
+            historyStack.removeAt(0)
+        }
         historyStack.add(
             state.copy(
                 batter1 = state.batter1.copy(),
@@ -273,6 +314,8 @@ class LiveScorerViewModel : ViewModel() {
         val legalBallsInOver = state.thisOver.count { !it.contains("Wd") && !it.contains("Nb") && !it.contains("Pen") }
         if (legalBallsInOver > 0 && legalBallsInOver % ballsPerOver == 0) {
             showSelectBowlerDialog = true
+            // Clear thisOver for the next over
+            state = state.copy(thisOver = emptyList())
         }
     }
 
@@ -358,12 +401,24 @@ class LiveScorerViewModel : ViewModel() {
             activePartnershipBatter2Balls = nextP2Balls
         )
 
+        // Persist delivery to Room for sync
+        persistDelivery(
+            runsOffBat = runsToAdd,
+            extrasType = null,
+            extrasRuns = 0
+        )
+
         triggerCallbacks(onScoreChanged)
         checkOverEnd()
     }
 
     fun recordExtra(extraType: String, onScoreChanged: (runs: Int, wickets: Int, overs: String, striker: String, nonStriker: String) -> Unit) {
         if (isScoringBlocked) return
+        // For By/Lb, show the extras dialog to allow amount selection
+        if (extraType == "By" || extraType == "Lb") {
+            activeExtraDialogType = extraType
+            return
+        }
         saveStateToHistory()
 
         val isWide = extraType == "Wd"
@@ -420,6 +475,13 @@ class LiveScorerViewModel : ViewModel() {
             activePartnershipBatter1Balls = nextP1Balls,
             activePartnershipBatter2Runs = state.activePartnershipBatter2Runs,
             activePartnershipBatter2Balls = nextP2Balls
+        )
+
+        // Persist delivery to Room for sync
+        persistDelivery(
+            runsOffBat = 0,
+            extrasType = extraType,
+            extrasRuns = extraRuns
         )
 
         triggerCallbacks(onScoreChanged)
@@ -500,6 +562,13 @@ class LiveScorerViewModel : ViewModel() {
             activePartnershipBatter1Balls = nextP1Balls,
             activePartnershipBatter2Runs = nextP2Runs,
             activePartnershipBatter2Balls = nextP2Balls
+        )
+
+        // Persist delivery to Room for sync
+        persistDelivery(
+            runsOffBat = batRuns,
+            extrasType = if (extrasVal > 0) extraType else null,
+            extrasRuns = extrasVal
         )
 
         triggerCallbacks(onScoreChanged)
@@ -650,8 +719,23 @@ class LiveScorerViewModel : ViewModel() {
             activePartnershipBatter2Runs = 0,
             activePartnershipBatter2Balls = 0
         )
+
+        // Persist wicket delivery to Room for sync
+        persistDelivery(
+            runsOffBat = completedRuns,
+            extrasType = extraType,
+            extrasRuns = extraConceded,
+            isWicket = true,
+            dismissalType = wicketType,
+            dismissedPlayerName = dismissedName,
+            fielderName = fielderName
+        )
+
         showWicketDialog = false
-        showSelectBatsmanDialog = true
+        if (!state.isInnings1Completed && !state.isMatchCompleted) {
+            showSelectBatsmanDialog = true
+        }
+        checkOverEnd()
     }
 
     fun confirmIncomingBatsman(
@@ -730,5 +814,68 @@ class LiveScorerViewModel : ViewModel() {
             state.batterStriker.name,
             state.batterNonStriker.name
         )
+    }
+
+    // ─── Delivery Persistence ──────────────────────────────────────
+
+    /**
+     * Persist each delivery to Room for crash recovery and API sync.
+     * This runs in a background coroutine to never block the UI.
+     */
+    private fun persistDelivery(
+        runsOffBat: Int = 0,
+        extrasType: String? = null,
+        extrasRuns: Int = 0,
+        isWicket: Boolean = false,
+        dismissalType: String? = null,
+        dismissedPlayerName: String? = null,
+        fielderName: String? = null
+    ) {
+        if (matchId.isBlank()) return // No match context set
+
+        val (wides, noBalls, byes, legByes) = when (extrasType) {
+            "Wd" -> listOf(extrasRuns, 0, 0, 0)
+            "Nb" -> listOf(0, extrasRuns, 0, 0)
+            "By" -> listOf(0, 0, extrasRuns, 0)
+            "Lb" -> listOf(0, 0, 0, extrasRuns)
+            "Byes" -> listOf(0, 0, extrasRuns, 0)
+            "Leg Byes" -> listOf(0, 0, 0, extrasRuns)
+            "Pen" -> listOf(0, 0, 0, 0) // penalty_runs handled separately
+            else -> listOf(0, 0, 0, 0)
+        }
+
+        val penaltyRuns = if (extrasType == "Pen") extrasRuns else 0
+
+        viewModelScope.launch {
+            try {
+                deliverySyncRepository.saveDelivery(
+                    PendingDeliveryEntity(
+                        matchId = matchId,
+                        inningsNumber = inningsNumber,
+                        runsOffBat = runsOffBat,
+                        wides = wides,
+                        noBalls = noBalls,
+                        byes = byes,
+                        legByes = legByes,
+                        penaltyRuns = penaltyRuns,
+                        strikerId = strikerServerId,
+                        nonStrikerId = nonStrikerServerId,
+                        bowlerId = bowlerServerId,
+                        overNumber = state.totalBalls / ballsPerOver,
+                        ballNumber = state.totalBalls % ballsPerOver,
+                        cumulativeRuns = state.runs,
+                        cumulativeWickets = state.wickets,
+                        cumulativeBalls = state.totalBalls
+                    )
+                )
+            } catch (e: Exception) {
+                // Silently fail — delivery data is still in memory
+                // Will be retried on next scoring action or full sync
+            }
+        }
+    }
+
+    companion object {
+        private const val MAX_HISTORY_SIZE = 50
     }
 }

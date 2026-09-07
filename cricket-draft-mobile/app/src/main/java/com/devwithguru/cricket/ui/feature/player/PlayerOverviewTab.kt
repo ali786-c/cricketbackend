@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @Composable
 fun PlayerOverviewTab(
@@ -105,7 +106,7 @@ fun PlayerOverviewTab(
         ) {
             Text(
                 text = playerName,
-                fontSize = 20.sp,
+                fontSize = screenConfig.scoreTextSize,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 fontFamily = FontFamily.SansSerif

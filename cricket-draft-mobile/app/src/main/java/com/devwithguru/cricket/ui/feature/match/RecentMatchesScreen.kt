@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.devwithguru.cricket.domain.model.ScheduledFixture
 import com.devwithguru.cricket.ui.theme.StatusLive
+import com.devwithguru.cricket.ui.theme.screenConfig
 import com.devwithguru.cricket.ui.feature.player.PlayerMatchesViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +59,7 @@ fun RecentMatchesScreen(
                 title = {
                     Text(
                         text = "Recent Matches",
-                        fontSize = 18.sp,
+                        fontSize = screenConfig.headingTextSize,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )

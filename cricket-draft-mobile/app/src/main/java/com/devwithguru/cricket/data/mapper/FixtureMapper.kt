@@ -7,6 +7,7 @@ import com.google.gson.Gson
 
 fun AdminFixtureEntity.toDomain() = Fixture(
     id = id,
+    serverId = serverId,
     tournamentId = tournamentId,
     stageId = stageId,
     stageName = stageName,
@@ -32,6 +33,7 @@ fun AdminFixtureEntity.toDomain() = Fixture(
 
 fun Fixture.toEntity() = AdminFixtureEntity(
     id = id,
+    serverId = serverId ?: id.toIntOrNull(),
     tournamentId = tournamentId,
     stageId = stageId,
     stageName = stageName,

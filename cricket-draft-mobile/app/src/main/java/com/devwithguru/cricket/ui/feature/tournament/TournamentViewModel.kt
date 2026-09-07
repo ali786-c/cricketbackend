@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.devwithguru.cricket.data.sync.SyncManager
 
 @HiltViewModel
 class TournamentViewModel @Inject constructor(
@@ -33,7 +34,8 @@ class TournamentViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val localAdminRepository: AdminLocalRepository,
     private val fixtureRepository: FixtureRepository,
-    private val teamRepository: TeamRepository
+    private val teamRepository: TeamRepository,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _tournaments = MutableStateFlow<List<Tournament>>(emptyList())
@@ -63,6 +65,7 @@ class TournamentViewModel @Inject constructor(
      * 2. Try API in background → save to Room → emit fresh data
      */
     fun loadAllTournaments() {
+        _isLoading.value = true
         viewModelScope.launch {
             // Step 1: Show Room data immediately (instant, offline-safe)
             tournamentRepository.getAllTournaments().collect {
@@ -85,6 +88,8 @@ class TournamentViewModel @Inject constructor(
                 // If API fails, Room data is already showing — no error needed
             } catch (_: Exception) {
                 // Offline — Room data already showing, nothing to do
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -95,6 +100,15 @@ class TournamentViewModel @Inject constructor(
      * 2. Try API in background → save to Room → emit fresh data
      */
     fun loadTournament(id: String) {
+        _isLoading.value = true
+        // Clear previous state if switching tournaments
+        if (_currentTournament.value?.id != id) {
+            _currentTournament.value = null
+            _teams.value = emptyList()
+            _standings.value = emptyList()
+            _fixtures.value = emptyList()
+        }
+
         // Show Room data immediately
         viewModelScope.launch {
             val roomTournament = tournamentRepository.getTournamentById(id)
@@ -113,7 +127,18 @@ class TournamentViewModel @Inject constructor(
         // Show local fixtures immediately (offline-first)
         viewModelScope.launch {
             fixtureRepository.getFixtures(id).collect { localFixtures ->
-                _fixtures.value = localFixtures.map { it.toTournamentFixtureData2() }
+                val mappedFixtures = localFixtures.map { f ->
+                    val scoredFixture = fixtureRepository.getScheduledFixtureById(f.id)
+                    f.toTournamentFixtureData2().copy(
+                        current_innings = scoredFixture?.currentInnings,
+                        current_runs = scoredFixture?.currentRuns,
+                        current_wickets = scoredFixture?.currentWickets,
+                        overs_bowled = scoredFixture?.oversBowled,
+                        first_innings_runs = scoredFixture?.firstInningsRuns,
+                        first_innings_wickets = scoredFixture?.firstInningsWickets
+                    )
+                }
+                _fixtures.value = mappedFixtures
                 calculateLocalStandings(id, localFixtures)
             }
         }
@@ -139,6 +164,7 @@ class TournamentViewModel @Inject constructor(
                                 apiTeams.forEach { apiTeam ->
                                     teamRepository.saveTeam(Team(
                                         id = apiTeam.id.toString(),
+                                        serverId = apiTeam.id,
                                         name = apiTeam.name ?: "",
                                         shortName = apiTeam.short_name ?: "",
                                         tournamentId = id,
@@ -169,6 +195,8 @@ class TournamentViewModel @Inject constructor(
 
             } catch (_: Exception) {
                 // Offline — Room data already showing
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -224,6 +252,15 @@ class TournamentViewModel @Inject constructor(
             val result = adminRepository.createTournament(token, request)
             result.onSuccess { data ->
                 _createdTournamentId.value = data.id.toString()
+                // Save to Room so it appears in "My Tournaments" immediately
+                val domain = data.toDomain()
+                tournamentRepository.saveTournament(domain)
+                // Queue for sync tracking � ensures dedup on next pull
+                syncManager.queueChange("tournament", data.id.toString(), "create", mapOf(
+                    "serverId" to data.id,
+                    "name" to name,
+                    "slug" to slug
+                ))
             }
             result.onFailure { e ->
                 _createError.value = e.message ?: "Failed to create tournament"
@@ -252,7 +289,10 @@ class TournamentViewModel @Inject constructor(
         viewModelScope.launch {
             // Load all teams of this tournament
             localAdminRepository.getTeams(tournamentId).collect { localTeams ->
-                if (localTeams.isEmpty()) return@collect
+                if (localTeams.isEmpty()) {
+                    _standings.value = emptyList()
+                    return@collect
+                }
 
                 // Initialize standings map
                 val standingsMap = localTeams.associate { it.id to TournamentStandingData(
@@ -276,8 +316,8 @@ class TournamentViewModel @Inject constructor(
                     if (f.status.lowercase() == "completed") {
                         val scoredFixture = fixtureRepository.getScheduledFixtureById(f.id)
                         if (scoredFixture != null) {
-                            val homeId = f.homeTeamId
-                            val awayId = f.awayTeamId
+                            val homeId = teamRepository.resolveOriginalTeamId(f.homeTeamId)
+                            val awayId = teamRepository.resolveOriginalTeamId(f.awayTeamId)
 
                             val homeStanding = standingsMap[homeId]
                             val awayStanding = standingsMap[awayId]
@@ -290,24 +330,58 @@ class TournamentViewModel @Inject constructor(
                                 val updatedHomePlayed = homeStanding.played + 1
                                 val updatedAwayPlayed = awayStanding.played + 1
 
+                                val (innings1TeamName, innings2TeamName) = when {
+                                    scoredFixture.tossWinner.equals(f.homeTeamName, ignoreCase = true) -> {
+                                        if (scoredFixture.tossDecision.equals("bat", ignoreCase = true)) {
+                                            Pair(f.homeTeamName, f.awayTeamName)
+                                        } else {
+                                            Pair(f.awayTeamName, f.homeTeamName)
+                                        }
+                                    }
+                                    scoredFixture.tossWinner.equals(f.awayTeamName, ignoreCase = true) -> {
+                                        if (scoredFixture.tossDecision.equals("bat", ignoreCase = true)) {
+                                            Pair(f.awayTeamName, f.homeTeamName)
+                                        } else {
+                                            Pair(f.homeTeamName, f.awayTeamName)
+                                        }
+                                    }
+                                    else -> Pair(f.homeTeamName, f.awayTeamName)
+                                }
+
                                 val (homeWin, awayWin, isTie) = when {
-                                    fRuns > sRuns -> Triple(1, 0, false)
-                                    sRuns > fRuns -> Triple(0, 1, false)
+                                    fRuns > sRuns -> {
+                                        if (innings1TeamName.equals(f.homeTeamName, ignoreCase = true)) {
+                                            Triple(1, 0, false)
+                                        } else {
+                                            Triple(0, 1, false)
+                                        }
+                                    }
+                                    sRuns > fRuns -> {
+                                        if (innings2TeamName.equals(f.homeTeamName, ignoreCase = true)) {
+                                            Triple(1, 0, false)
+                                        } else {
+                                            Triple(0, 1, false)
+                                        }
+                                    }
                                     else -> Triple(0, 0, true)
                                 }
 
                                 val updatedHomeWins = homeStanding.wins + homeWin
-                                val updatedHomeLosses = homeStanding.losses + awayWin
+                                val updatedHomeLosses = homeStanding.losses + (if (isTie) 0 else 1 - homeWin)
                                 val updatedHomeTies = homeStanding.ties + (if (isTie) 1 else 0)
                                 val updatedHomePoints = homeStanding.points + (homeWin * 2) + (if (isTie) 1 else 0)
 
                                 val updatedAwayWins = awayStanding.wins + awayWin
-                                val updatedAwayLosses = awayStanding.losses + homeWin
+                                val updatedAwayLosses = awayStanding.losses + (if (isTie) 0 else 1 - awayWin)
                                 val updatedAwayTies = awayStanding.ties + (if (isTie) 1 else 0)
                                 val updatedAwayPoints = awayStanding.points + (awayWin * 2) + (if (isTie) 1 else 0)
 
-                                val homeDiff = (fRuns - sRuns).toDouble() / 20.0
-                                val awayDiff = (sRuns - fRuns).toDouble() / 20.0
+                                val matchOvers = scoredFixture.overs.toDouble().takeIf { it > 0.0 } ?: 20.0
+                                val homeRuns = if (innings1TeamName.equals(f.homeTeamName, ignoreCase = true)) fRuns else sRuns
+                                val awayRuns = if (innings1TeamName.equals(f.awayTeamName, ignoreCase = true)) fRuns else sRuns
+
+                                val homeDiff = (homeRuns - awayRuns).toDouble() / matchOvers
+                                val awayDiff = (awayRuns - homeRuns).toDouble() / matchOvers
 
                                 standingsMap[homeId] = homeStanding.copy(
                                     played = updatedHomePlayed,
@@ -349,6 +423,7 @@ class TournamentViewModel @Inject constructor(
 
 fun TournamentData.toDomain() = Tournament(
     id = id.toString(),
+    serverId = id,
     name = name ?: "Unknown",
     description = description ?: "",
     logo = logo,
@@ -361,7 +436,7 @@ fun TournamentData.toDomain() = Tournament(
     startDate = starts_on ?: "",
     endDate = ends_on ?: "",
     ballType = ball_type ?: rule_profile?.format ?: "Tennis Ball",
-    oversPerInnings = rule_profile?.overs_per_innings ?: 20,
+    oversPerInnings = default_overs_per_innings ?: rule_profile?.overs_per_innings ?: 20,
     competitionStructure = competition_structure ?: "League",
     visibility = if (is_public == true) "public" else "private",
     tournamentCode = tournament_code,

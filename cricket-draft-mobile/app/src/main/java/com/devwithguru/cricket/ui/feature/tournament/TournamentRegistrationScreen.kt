@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +54,7 @@ fun TournamentRegistrationScreen(
         ) {
             Icon(Icons.Default.SportsCricket, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(tournamentName, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(tournamentName, fontSize = screenConfig.scoreTextSize, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(24.dp))
 
             when {

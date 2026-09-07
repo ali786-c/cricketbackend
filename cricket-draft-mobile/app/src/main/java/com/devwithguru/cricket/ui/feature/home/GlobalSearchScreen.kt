@@ -30,12 +30,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.devwithguru.cricket.ui.viewmodels.SearchViewModel
+import com.devwithguru.cricket.ui.viewmodels.SearchItem
 
-data class SearchItem(
-    val id: String,
-    val type: String, // "player", "team", "match", "tournament"
-    val title: String,
-    val subtitle: String
+private val typeIcons = mapOf(
+    "player" to Icons.Default.Person,
+    "team" to Icons.Default.Shield,
+    "tournament" to Icons.Default.EmojiEvents,
+    "match" to Icons.Default.SportsCricket
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,51 +47,17 @@ fun GlobalSearchScreen(
     onNavigateToTeamDetail: (teamId: String) -> Unit,
     onNavigateToTournamentHub: (tournamentId: String) -> Unit,
     onNavigateToMatchCenter: (matchId: String) -> Unit,
-    onNavigateBack: () -> Unit
-,
-    viewModel: com.devwithguru.cricket.ui.viewmodels.MainViewModel = hiltViewModel()
+    onNavigateBack: () -> Unit,
+    viewModel: SearchViewModel = hiltViewModel()
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val recentSearches = remember { viewModel.getRecentSearches() }
 
-    // Unified Mock Database
-    val mockDatabase = remember {
-        listOf(
-            SearchItem("h1", "player", "Ahmed Ali", "Ali Panthers • All-rounder"),
-            SearchItem("h2", "player", "Bilal Butt", "Ali Panthers • Batter"),
-            SearchItem("h3", "player", "Salman Ahmed", "Ali Panthers • Wicketkeeper"),
-            SearchItem("h4", "player", "Usman Shinwari", "Ali Panthers • Bowler"),
-            SearchItem("a1", "player", "Yasir Khan", "Islamabad Blasters • Bowler"),
-            SearchItem("a2", "player", "Babar Azam", "Islamabad Blasters • Batter"),
-            SearchItem("a3", "player", "Mohammad Rizwan", "Islamabad Blasters • Wicketkeeper"),
-            SearchItem("a4", "player", "Shaheen Afridi", "Islamabad Blasters • Bowler"),
-
-            SearchItem("1", "team", "Ali Panthers", "Active in Premier Cricket Cup 2026"),
-            SearchItem("2", "team", "Rawalpindi Kings", "Active in Premier Cricket Cup 2026"),
-            SearchItem("3", "team", "Islamabad Blasters", "Active in Premier Cricket Cup 2026"),
-            SearchItem("4", "team", "Karachi Tigers", "Active in Premier Cricket Cup 2026"),
-            SearchItem("5", "team", "Lahore Qalandars", "Active in local cups"),
-            SearchItem("6", "team", "Peshawar Stars", "Active in local cups"),
-
-            SearchItem("1", "tournament", "Premier Cricket Cup 2026", "Live & Active group stages"),
-            SearchItem("2", "tournament", "Summer Smash 2025", "Concluded tournament"),
-            SearchItem("3", "tournament", "Super League 2024", "Concluded tournament"),
-
-            SearchItem("1", "match", "Ali Panthers vs Rawalpindi Kings", "Completed - Ali Panthers won by 4 runs"),
-            SearchItem("2", "match", "Blasters vs Karachi Tigers", "Completed - Blasters won by 7 wickets"),
-            SearchItem("3", "match", "Lahore Qalandars vs Peshawar Stars", "Upcoming - Aug 20, 2026")
-        )
-    }
-
-    // Filter results
-    val filteredResults = remember(searchQuery) {
-        if (searchQuery.trim().isEmpty()) {
-            emptyList()
-        } else {
-            mockDatabase.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                        it.subtitle.contains(searchQuery, ignoreCase = true)
-            }
-        }
+    // Grouped search results
+    val groupedResults = remember(searchResults) {
+        searchResults.groupBy { it.type }.toMutableMap()
     }
 
     Scaffold(
@@ -115,13 +83,22 @@ fun GlobalSearchScreen(
 
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = { viewModel.search(it) },
                         placeholder = { Text("Search players, teams, tournaments...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                            Row {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.clearSearch() }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 }
                             }
                         },
@@ -165,13 +142,20 @@ fun GlobalSearchScreen(
                     )
             )
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (searchQuery.trim().isEmpty()) {
-                    // Recent Searches
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (searchQuery.isEmpty()) {
+                // Recent Searches
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     item {
                         Text(
                             text = "Recent Searches",
@@ -181,40 +165,51 @@ fun GlobalSearchScreen(
                         )
                     }
 
-                    val recents = listOf(
-                        SearchItem("h1", "player", "Ahmed Ali", "Ali Panthers"),
-                        SearchItem("1", "team", "Ali Panthers", "Group Stage"),
-                        SearchItem("1", "tournament", "Premier Cricket Cup 2026", "Live")
-                    )
-
-                    items(recents) { item ->
+                    items(recentSearches) { item ->
                         RecentSearchItemRow(item) {
-                            searchQuery = item.title
+                            viewModel.search(item.title)
                         }
                     }
-                } else if (filteredResults.isEmpty()) {
-                    // Empty Results State
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No results found for \"$searchQuery\"",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                }
+            } else if (searchResults.isEmpty()) {
+                // Empty Results State
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No results found for \"$searchQuery\"",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Try different keywords",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
                     }
-                } else {
-                    // Grouped Search Results
-                    val grouped = filteredResults.groupBy { it.type }
-
+                }
+            } else {
+                // Grouped Search Results
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     listOf("player", "team", "tournament", "match").forEach { type ->
-                        val groupList = grouped[type]
+                        val groupList = groupedResults[type]
                         if (!groupList.isNullOrEmpty()) {
                             item {
                                 Text(
@@ -319,12 +314,7 @@ fun SearchResultItemCard(item: SearchItem, onClick: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = when (item.type) {
-                            "player" -> Icons.Default.Person
-                            "team" -> Icons.Default.Shield
-                            "tournament" -> Icons.Default.EmojiEvents
-                            else -> Icons.Default.SportsCricket
-                        },
+                        imageVector = typeIcons[item.type] ?: Icons.Default.SportsCricket,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)

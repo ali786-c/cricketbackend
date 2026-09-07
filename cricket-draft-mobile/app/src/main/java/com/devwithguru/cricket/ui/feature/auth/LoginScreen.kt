@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.devwithguru.cricket.ui.feature.auth.AuthViewModel
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +104,7 @@ fun LoginScreen(
 
             Text(
                 text = "STUMPS",
-                fontSize = 36.sp,
+                fontSize = screenConfig.displayTextSize,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 letterSpacing = (-1).sp

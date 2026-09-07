@@ -7,6 +7,7 @@ package com.devwithguru.cricket.domain.model
 data class Tournament(
     // ── Identity ──
     val id: String,
+    val serverId: Int? = null,
     val name: String,
 
     // ── Basic Info (PRD §6.1) ──
@@ -29,6 +30,7 @@ data class Tournament(
     // T10, T20, ODI, Test, Tape Ball, Tennis Ball, Hard Ball, Indoor Cricket, Custom
     val ballType: String = "Tennis Ball",
     val oversPerInnings: Int = 20,
+    val wicketsPerTeam: Int = 10,
 
     // ── Competition Structure (PRD §48) ──
     // League, Knockout, Group + Playoffs, Custom

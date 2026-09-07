@@ -21,7 +21,7 @@ object NetworkModule {
 
     // ── Base URL ──────────────────────────────────────────
     // Change this to your Laravel backend URL
-    private const val BASE_URL = "https://your-api-domain.com/"
+    private const val BASE_URL = "https://backedn.careerinpak.com/"
 
     // ── Timeout Config ────────────────────────────────────
     private const val CONNECT_TIMEOUT = 15L

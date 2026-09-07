@@ -50,5 +50,6 @@ data class AdminFixtureEntity(
     val tossDecision: String? = null,
 
     // ── Sync ──
-    val syncStatus: String = "pending"
+    val syncStatus: String = "pending",
+    val updatedAt: Long = System.currentTimeMillis()
 )

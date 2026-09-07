@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import com.devwithguru.cricket.ui.feature.match.viewmodels.CreateMatchViewModel
 import com.devwithguru.cricket.domain.model.ScheduledFixture
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +52,7 @@ fun CreateMatchScreen(
     tournamentId: String? = null,
     onCreateMatchSuccess: (matchId: String, homeTeam: String, awayTeam: String, overs: Int, ballType: String, date: String, time: String) -> Unit,
     onNavigateBack: () -> Unit,
+    defaultWickets: Int = 10,
     viewModel: CreateMatchViewModel = hiltViewModel()
 ) {
     var homeTeam by remember { mutableStateOf("") }
@@ -62,7 +64,7 @@ fun CreateMatchScreen(
     var selectedOvers by remember { mutableStateOf("6") }
     var selectedMatchType by remember { mutableStateOf("T20") }
     var selectedBallType by remember { mutableStateOf("Tennis") }
-    var selectedWickets by remember { mutableStateOf("10") }
+    var selectedWickets by remember { mutableStateOf(defaultWickets.toString()) }
 
     var oversDropdownExpanded by remember { mutableStateOf(false) }
     var matchTypeDropdownExpanded by remember { mutableStateOf(false) }
@@ -235,7 +237,7 @@ fun CreateMatchScreen(
                             if (homeTeam.isNotBlank()) {
                                 Text(
                                     text = homeTeam.take(2).uppercase(),
-                                    fontSize = 20.sp,
+                                    fontSize = screenConfig.scoreTextSize,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -281,7 +283,7 @@ fun CreateMatchScreen(
                             if (awayTeam.isNotBlank()) {
                                 Text(
                                     text = awayTeam.take(2).uppercase(),
-                                    fontSize = 20.sp,
+                                    fontSize = screenConfig.scoreTextSize,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -484,9 +486,11 @@ fun CreateMatchScreen(
                                 onDismissRequest = { wicketsDropdownExpanded = false }
                             ) {
                                 listOf(
-                                    "10" to stringResource(R.string.wickets_10_label),
+                                    "3" to "3 Wickets",
                                     "5" to stringResource(R.string.wickets_5_label),
-                                    "8" to stringResource(R.string.wickets_8_label)
+                                    "6" to "6 Wickets",
+                                    "8" to stringResource(R.string.wickets_8_label),
+                                    "10" to stringResource(R.string.wickets_10_label)
                                 ).forEach { (num, label) ->
                                     DropdownMenuItem(
                                         text = { Text(label) },

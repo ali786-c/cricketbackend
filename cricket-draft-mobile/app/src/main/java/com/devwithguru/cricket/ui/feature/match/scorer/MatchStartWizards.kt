@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @Composable
 fun SelectOpeningStrikerDialog(
@@ -28,7 +29,7 @@ fun SelectOpeningStrikerDialog(
             title = {
                 Text(
                     text = "Select Opening Striker",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -70,7 +71,7 @@ fun SelectOpeningNonStrikerDialog(
             title = {
                 Text(
                     text = "Select Opening Non-Striker",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -127,7 +128,7 @@ fun SelectOpeningBatsmenDialog(
             title = {
                 Text(
                     text = "Select Opening Batsmen",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -212,7 +213,7 @@ fun SelectOpeningBowlerDialog(
             title = {
                 Text(
                     text = "Select Opening Bowler",
-                    fontSize = 16.sp,
+                    fontSize = screenConfig.headingTextSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )

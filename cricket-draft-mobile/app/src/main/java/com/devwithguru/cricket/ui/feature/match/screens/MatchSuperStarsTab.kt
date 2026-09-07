@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.theme.screenConfig
 import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerViewModel
 import com.devwithguru.cricket.domain.model.ScheduledFixture
 
@@ -42,7 +43,7 @@ fun MatchSuperStarsTab(
 ) {
     val fixtureData = activeFixture ?: remember(matchId) { null }
     val currentInnings = fixtureData?.currentInnings ?: 1
-    val isCompleted = activeFixture?.status == "Completed"
+    val isCompleted = activeFixture?.status?.lowercase() == "completed"
 
     val mvpStars = remember(currentInnings, viewModel.state, isCompleted) {
         val playersMap = mutableMapOf<String, TempPlayerMVP>()
@@ -50,23 +51,7 @@ fun MatchSuperStarsTab(
         fun getOrCreate(name: String) = playersMap.getOrPut(name) { TempPlayerMVP(name) }
 
         // --- INNINGS 1 DATA ---
-        if (currentInnings == 1) {
-            // Innings 1 is Live
-            viewModel.state.batsmenStats.values.forEach { b ->
-                val p = getOrCreate(b.name)
-                p.runs += b.runs
-                p.ballsFaced += b.balls
-                p.fours += b.fours
-                p.sixes += b.sixes
-            }
-            viewModel.state.bowlersStats.values.forEach { b ->
-                val p = getOrCreate(b.name)
-                p.wickets += b.wickets
-                p.ballsBowled += b.balls
-                p.runsConceded += b.runsConceded
-            }
-        } else {
-            // Innings 1 is completed (read from fixture)
+        if (isCompleted) {
             fixtureData?.firstInningsBatsmen?.forEach { b ->
                 val p = getOrCreate(b.name)
                 p.runs += b.runs
@@ -80,25 +65,42 @@ fun MatchSuperStarsTab(
                 p.ballsBowled += b.balls
                 p.runsConceded += b.runsConceded
             }
+        } else {
+            if (currentInnings == 1) {
+                // Innings 1 is Live
+                viewModel.state.batsmenStats.values.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.runs += b.runs
+                    p.ballsFaced += b.balls
+                    p.fours += b.fours
+                    p.sixes += b.sixes
+                }
+                viewModel.state.bowlersStats.values.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.wickets += b.wickets
+                    p.ballsBowled += b.balls
+                    p.runsConceded += b.runsConceded
+                }
+            } else {
+                // Innings 1 is completed (read from fixture)
+                fixtureData?.firstInningsBatsmen?.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.runs += b.runs
+                    p.ballsFaced += b.balls
+                    p.fours += b.fours
+                    p.sixes += b.sixes
+                }
+                fixtureData?.firstInningsBowlers?.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.wickets += b.wickets
+                    p.ballsBowled += b.balls
+                    p.runsConceded += b.runsConceded
+                }
+            }
         }
 
         // --- INNINGS 2 DATA ---
-        if (currentInnings == 2) {
-            // Innings 2 is Live
-            viewModel.state.batsmenStats.values.forEach { b ->
-                val p = getOrCreate(b.name)
-                p.runs += b.runs
-                p.ballsFaced += b.balls
-                p.fours += b.fours
-                p.sixes += b.sixes
-            }
-            viewModel.state.bowlersStats.values.forEach { b ->
-                val p = getOrCreate(b.name)
-                p.wickets += b.wickets
-                p.ballsBowled += b.balls
-                p.runsConceded += b.runsConceded
-            }
-        } else if (isCompleted) {
+        if (isCompleted) {
             // Innings 2 is completed (read from fixture)
             fixtureData?.secondInningsBatsmen?.forEach { b ->
                 val p = getOrCreate(b.name)
@@ -112,6 +114,23 @@ fun MatchSuperStarsTab(
                 p.wickets += b.wickets
                 p.ballsBowled += b.balls
                 p.runsConceded += b.runsConceded
+            }
+        } else {
+            if (currentInnings == 2) {
+                // Innings 2 is Live
+                viewModel.state.batsmenStats.values.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.runs += b.runs
+                    p.ballsFaced += b.balls
+                    p.fours += b.fours
+                    p.sixes += b.sixes
+                }
+                viewModel.state.bowlersStats.values.forEach { b ->
+                    val p = getOrCreate(b.name)
+                    p.wickets += b.wickets
+                    p.ballsBowled += b.balls
+                    p.runsConceded += b.runsConceded
+                }
             }
         }
 
@@ -148,7 +167,7 @@ fun MatchSuperStarsTab(
             Text(
                 text = "Match Super Stars (MVP Rankings)",
                 color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
+                fontSize = screenConfig.bodyTextSize,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
@@ -218,7 +237,7 @@ fun MatchSuperStarsTab(
                                     Text(
                                         text = star.name,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontSize = 14.sp,
+                                        fontSize = screenConfig.bodyTextSize,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -247,7 +266,7 @@ fun MatchSuperStarsTab(
                             Text(
                                 text = "${star.pts}",
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 14.sp,
+                                fontSize = screenConfig.bodyTextSize,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(

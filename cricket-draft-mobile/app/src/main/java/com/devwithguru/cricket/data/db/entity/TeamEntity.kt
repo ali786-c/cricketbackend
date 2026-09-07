@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class TeamEntity(
     @PrimaryKey
     val id: String,
+    val serverId: Int? = null,
     val name: String,
     val shortName: String = "",
     val tournamentId: String = "",
@@ -19,5 +20,8 @@ data class TeamEntity(
     val captainName: String? = null,
     val viceCaptainName: String? = null,
     val wicketkeeperName: String? = null,
-    val creatorId: Int? = null
+    val creatorId: Int? = null,
+
+    // ── Sync ──
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -31,6 +31,7 @@ data class ScreenConfig(
     val isLarge: Boolean,     // Large phones
     val isTablet: Boolean     // Tablets/foldables
 ) {
+    // ─── Spacing ──────────────────────────────────────────
     val horizontalPadding: Dp
         get() = when (screenSize) {
             ScreenSize.Small -> 12.dp
@@ -79,20 +80,77 @@ data class ScreenConfig(
             ScreenSize.XLarge -> 20.dp
         }
 
-    val buttonTextSize: androidx.compose.ui.unit.TextUnit
+    // ─── Responsive Text Sizes ────────────────────────────
+    // Display: hero numbers, scores, big counters
+    val displayTextSize: TextUnit
         get() = when (screenSize) {
-            ScreenSize.Small -> 11.sp
+            ScreenSize.Small -> 24.sp
+            ScreenSize.Medium -> 28.sp
+            ScreenSize.Large -> 32.sp
+            ScreenSize.XLarge -> 36.sp
+        }
+
+    // Heading: screen titles, section headers
+    val headingTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 15.sp
+            ScreenSize.Medium -> 17.sp
+            ScreenSize.Large -> 19.sp
+            ScreenSize.XLarge -> 21.sp
+        }
+
+    // Subheading: card titles, list item titles
+    val subheadingTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 13.sp
+            ScreenSize.Medium -> 14.sp
+            ScreenSize.Large -> 15.sp
+            ScreenSize.XLarge -> 16.sp
+        }
+
+    // Title: tab titles, toolbar titles (was titleTextSize)
+    val titleTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 14.sp
+            ScreenSize.Medium -> 16.sp
+            ScreenSize.Large -> 18.sp
+            ScreenSize.XLarge -> 20.sp
+        }
+
+    // Body: main readable text, descriptions
+    val bodyTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 12.sp
             ScreenSize.Medium -> 13.sp
             ScreenSize.Large -> 14.sp
             ScreenSize.XLarge -> 15.sp
         }
 
-    val titleTextSize: androidx.compose.ui.unit.TextUnit
+    // Button: action buttons, chips
+    val buttonTextSize: TextUnit
         get() = when (screenSize) {
-            ScreenSize.Small -> 16.sp
-            ScreenSize.Medium -> 18.sp
-            ScreenSize.Large -> 20.sp
-            ScreenSize.XLarge -> 22.sp
+            ScreenSize.Small -> 11.sp
+            ScreenSize.Medium -> 12.sp
+            ScreenSize.Large -> 13.sp
+            ScreenSize.XLarge -> 14.sp
+        }
+
+    // Caption: timestamps, helper text, fine print
+    val captionTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 10.sp
+            ScreenSize.Medium -> 11.sp
+            ScreenSize.Large -> 12.sp
+            ScreenSize.XLarge -> 12.sp
+        }
+
+    // Score: live match score numbers (larger for visibility)
+    val scoreTextSize: TextUnit
+        get() = when (screenSize) {
+            ScreenSize.Small -> 20.sp
+            ScreenSize.Medium -> 22.sp
+            ScreenSize.Large -> 26.sp
+            ScreenSize.XLarge -> 30.sp
         }
 }
 

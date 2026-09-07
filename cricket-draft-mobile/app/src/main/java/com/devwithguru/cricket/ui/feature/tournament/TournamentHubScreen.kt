@@ -26,7 +26,7 @@ fun TournamentHubScreen(
     initialTab: Int = 0,
     onTabChanged: (Int) -> Unit = {},
     onNavigateToTeamDetail: (teamId: String) -> Unit,
-    onNavigateToMatchCenter: (matchId: String) -> Unit,
+    onNavigateToMatchCenter: (matchId: String, isScorer: Boolean) -> Unit,
     onStartMatch: (matchId: String, homeTeam: String, awayTeam: String, status: String, tossWinner: String?, tossDecision: String?) -> Unit = { _, _, _, _, _, _ -> },
     onScheduleMatch: (tournamentId: String) -> Unit = {},
     onCreateGroup: (tournamentId: String) -> Unit = {},
@@ -169,8 +169,18 @@ fun TournamentHubScreen(
                     )
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                ScrollableTabRow(
+            val isLoading by viewModel.isLoading.collectAsState()
+
+            if (isLoading || currentTournament == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -243,6 +253,7 @@ fun TournamentHubScreen(
                         4 -> TournamentStatisticsTab(standings = standings)
                     }
                 }
+            }
             }
         }
     }

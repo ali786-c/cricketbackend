@@ -66,6 +66,9 @@ dependencies {
     // Gson (for TypeConverters - List serialization)
     implementation(libs.gson)
 
+    // Security (EncryptedSharedPreferences for auth token)
+    implementation(libs.androidx.security.crypto)
+
     // Network (Retrofit + OkHttp)
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.gson)

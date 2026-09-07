@@ -35,6 +35,7 @@ import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerScreen
 import com.devwithguru.cricket.ui.feature.match.screens.MatchCenterScreen
 import com.devwithguru.cricket.ui.feature.player.PlayerProfileScreen
 import com.devwithguru.cricket.ui.feature.home.GlobalSearchScreen
+import com.devwithguru.cricket.ui.feature.home.MyTeamsScreen
 import com.devwithguru.cricket.ui.feature.match.screens.MatchEditorScreen
 import com.devwithguru.cricket.ui.feature.match.RecentMatchesScreen
 import com.devwithguru.cricket.domain.model.ScheduledFixture
@@ -42,6 +43,7 @@ import com.devwithguru.cricket.ui.viewmodels.MainViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import com.devwithguru.cricket.ui.feature.match.scorer.LiveScorerViewModel
+import com.devwithguru.cricket.ui.components.SyncStatusIndicator
 import com.devwithguru.cricket.ui.theme.CricketTheme
 import com.devwithguru.cricket.ui.navigation.Screen
 import com.devwithguru.cricket.ui.viewmodels.NavigationViewModel
@@ -62,12 +64,11 @@ class MainActivity : ComponentActivity() {
                     val currentScreen = navigationViewModel.currentScreen
                     val navigationStack = navigationViewModel.navigationStack
                     var loggedInEmail by remember { mutableStateOf("") }
-                    val scorerViewModel = remember { LiveScorerViewModel() }
+                    val scorerViewModel: LiveScorerViewModel = hiltViewModel()
                     val mainViewModel: MainViewModel = hiltViewModel()
                     val currentFixture by mainViewModel.currentFixture.collectAsState()
                     val context = LocalContext.current
 
-                    val msgNavigateMyTeams = stringResource(R.string.msg_navigate_my_teams)
                     val msgLoggedOut = stringResource(R.string.msg_logged_out)
                     val msgMatchSetupComplete = stringResource(R.string.msg_match_setup_complete)
                     val msgMatchCompletedResultsSaved = stringResource(R.string.msg_match_completed_results_saved)
@@ -126,7 +127,7 @@ class MainActivity : ComponentActivity() {
                                     navigationViewModel.navigateTo(Screen.MyTournaments)
                                 },
                                 onNavigateToMyTeams = {
-                                    Toast.makeText(context, msgNavigateMyTeams, Toast.LENGTH_SHORT).show()
+                                    navigationViewModel.navigateTo(Screen.MyTeams)
                                 },
                                 onNavigateToPlayerProfile = {
                                     navigationViewModel.navigateTo(Screen.PlayerProfile("p1"))
@@ -153,6 +154,7 @@ class MainActivity : ComponentActivity() {
                         is Screen.CreateMatch -> {
                             CreateMatchScreen(
                                 tournamentId = screen.tournamentId,
+                                defaultWickets = screen.defaultWickets,
                                 onCreateMatchSuccess = { matchId, home, away, overs, ballType, date, time ->
                                     navigationViewModel.navigateTo(Screen.Toss(matchId, home, away))
                                 },
@@ -168,9 +170,9 @@ class MainActivity : ComponentActivity() {
                                 onCreateTournamentSuccess = { tournamentId, name, hasDraft ->
                                     Toast.makeText(context, "Tournament \"$name\" created!", Toast.LENGTH_SHORT).show()
                                     if (hasDraft) {
-                                        navigationViewModel.navigateTo(Screen.TournamentSetup(tournamentId, true))
+                                        navigationViewModel.updateCurrentScreen(Screen.CreateTournament, Screen.TournamentSetup(tournamentId, true))
                                     } else {
-                                        navigationViewModel.navigateTo(Screen.TournamentHub(tournamentId))
+                                        navigationViewModel.updateCurrentScreen(Screen.CreateTournament, Screen.TournamentHub(tournamentId))
                                     }
                                 },
                                 onNavigateBack = {
@@ -241,6 +243,22 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                        Screen.MyTeams -> {
+                            MyTeamsScreen(
+                                onNavigateBack = {
+                                    if (navigationViewModel.currentScreen == Screen.MyTeams) {
+                                        navigationViewModel.navigateBack()
+                                    }
+                                },
+                                onNavigateToTeamDetail = { teamId ->
+                                    navigationViewModel.navigateTo(Screen.TeamDetail(teamId))
+                                },
+                                onAddTeam = {
+                                    // Navigate to AddTeam screen - for now, use a default tournament id or create new tournament flow
+                                    Toast.makeText(context, "Create or add team", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                         is Screen.TournamentHub -> {
                             TournamentHubScreen(
                                 tournamentId = screen.tournamentId,
@@ -254,8 +272,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToTeamDetail = { teamId ->
                                     navigationViewModel.navigateTo(Screen.TeamDetail(teamId))
                                 },
-                                onNavigateToMatchCenter = { matchId ->
-                                    navigationViewModel.navigateTo(Screen.MatchCenter(matchId = matchId, isScorer = false))
+                                 onNavigateToMatchCenter = { matchId, isScorer ->
+                                     navigationViewModel.navigateTo(Screen.MatchCenter(matchId = matchId, isScorer = isScorer))
                                 },
                                  onStartMatch = { matchId, home, away, status, tossWinner, tossDecision ->
                                      if (status.lowercase() == "toss_completed" && !tossWinner.isNullOrBlank() && !tossDecision.isNullOrBlank()) {
@@ -432,24 +450,25 @@ class MainActivity : ComponentActivity() {
                                 tossWinner = screen.tossWinner,
                                 tossDecision = screen.tossDecision,
                                 onStartMatchSuccess = { winner, decision, homeLineup, awayLineup ->
-                                    // Update fixture status via ViewModel
-                                    val fixture = mainViewModel.getFixture(screen.matchId) ?: currentFixture?.takeIf { it.id == screen.matchId }
-                                    fixture?.let { f ->
-                                        f.status = "Live"
-                                        f.homeSquad = homeLineup
-                                        f.awaySquad = awayLineup
-                                        mainViewModel.updateFixture(f)
-                                    }
-                                    Toast.makeText(context, msgMatchSetupComplete, Toast.LENGTH_SHORT).show()
-                                    navigationViewModel.navigateTo(
-                                        Screen.MatchCenter(
-                                            matchId = screen.matchId,
-                                            isScorer = true,
-                                            homeSquadList = homeLineup,
-                                            awaySquadList = awayLineup
-                                        )
-                                    )
-                                },
+                                     mainViewModel.startMatch(
+                                         matchId = screen.matchId,
+                                         tossWinner = winner,
+                                         tossDecision = decision,
+                                         homeSquad = homeLineup,
+                                         awaySquad = awayLineup
+                                     ) {
+                                         Toast.makeText(context, msgMatchSetupComplete, Toast.LENGTH_SHORT).show()
+                                         navigationViewModel.navigateTo(
+                                             Screen.MatchCenter(
+                                                 matchId = screen.matchId,
+                                                 isScorer = true,
+                                                 homeSquadList = homeLineup,
+                                                 awaySquadList = awayLineup
+                                             )
+                                         )
+                                         navigationViewModel.removeTossAndLineup()
+                                     }
+                                 },
                                 onNavigateBack = {
                                     if (navigationViewModel.currentScreen is Screen.TossLineup) {
                                         navigationViewModel.navigateBack()
@@ -468,7 +487,7 @@ class MainActivity : ComponentActivity() {
                                 onNavigateBack = {
                                     val fixture = mainViewModel.getFixture(screen.matchId) ?: currentFixture?.takeIf { it.id == screen.matchId }
                                     fixture?.let { f ->
-                                        if (f.status != "Completed") {
+                                        if (f.status.lowercase() != "completed") {
                                             f.status = "Live"
                                             mainViewModel.updateFixture(f)
                                         }
@@ -509,7 +528,6 @@ class MainActivity : ComponentActivity() {
                                             Toast.makeText(context, msgMatchCompletedResultsSaved, Toast.LENGTH_LONG).show()
                                             // Go back to previous screen (Hub or Home)
                                             navigationViewModel.navigateBack()
-                                            navigationViewModel.navigateBack()
                                         }
                                         // Persist fixture changes to Room
                                         mainViewModel.updateFixture(f)
@@ -526,7 +544,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onStartScheduledMatch = { fixture ->
-                                    if (fixture.status == "Live") {
+                                    if (fixture.status.lowercase() == "live") {
                                         // Resume scoring directly
                                         navigationViewModel.navigateTo(
                                             Screen.MatchCenter(
@@ -582,9 +600,9 @@ class MainActivity : ComponentActivity() {
                         }
                         Screen.RecentMatches -> {
                             RecentMatchesScreen(
-                                onNavigateToMatchCenter = { matchId ->
-                                    navigationViewModel.navigateTo(Screen.MatchCenter(matchId = matchId, isScorer = false))
-                                },
+                                 onNavigateToMatchCenter = { matchId ->
+                                     navigationViewModel.navigateTo(Screen.MatchCenter(matchId = matchId, isScorer = false))
+                                 },
                                 onNavigateToTournamentHub = { tournamentId ->
                                     navigationViewModel.navigateTo(Screen.TournamentHub(tournamentId))
                                 },

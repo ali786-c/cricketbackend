@@ -81,21 +81,26 @@ class PlayerProfileViewModel @Inject constructor(
             try {
                 val result = playerApiRepository.getPlayerTeams(playerId, token)
                 result.onSuccess { _teams.value = it }
-            } catch (_: Exception) { }
-
-            _isLoading.value = false
+            } catch (_: Exception) {
+                // Ignore API errors, use Room data
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
     /**
      * Load player from Room only.
      */
-    fun loadPlayerFromRoom(playerId: String) {
+    fun loadPlayerProfile(playerId: String) {
+        _isLoading.value = true
+        // Show Room data immediately
         viewModelScope.launch {
             var localPlayer = playerRepository.findById(playerId)
             if (localPlayer != null) {
                 _player.value = localPlayer
             }
+            _isLoading.value = false
         }
     }
 }

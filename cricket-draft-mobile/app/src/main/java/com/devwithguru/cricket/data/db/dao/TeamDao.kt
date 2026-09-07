@@ -26,6 +26,12 @@ interface TeamDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTeam(team: TeamEntity): Long
 
+    @Query("SELECT * FROM teams WHERE serverId = :serverId LIMIT 1")
+    suspend fun findByServerId(serverId: Int): TeamEntity?
+
+    @Query("UPDATE teams SET serverId = :serverId, updatedAt = :updatedAt WHERE id = :localId")
+    suspend fun updateServerId(localId: String, serverId: Int, updatedAt: Long = System.currentTimeMillis())
+
     @Update
     suspend fun updateTeam(team: TeamEntity)
 

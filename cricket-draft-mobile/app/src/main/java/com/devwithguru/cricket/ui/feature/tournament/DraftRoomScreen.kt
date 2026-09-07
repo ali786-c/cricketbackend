@@ -26,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.devwithguru.cricket.data.api.DraftAvailablePlayer
 import com.devwithguru.cricket.data.api.DraftStateData
 import com.devwithguru.cricket.data.api.DraftTeamSquad
+import com.devwithguru.cricket.ui.theme.screenConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,9 +70,9 @@ fun DraftRoomScreen(
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     if (isAdmin && activePick != null) {
-                                        viewModel.adminSelectPlayer(tournamentId, activePick.pick_number, player.id)
+                                        viewModel.adminSelectPlayer(tournamentId, activePick.pick_number, player.id.toInt())
                                     } else {
-                                        viewModel.captainPick(tournamentId, player.id)
+                                        viewModel.captainPick(tournamentId, player.id.toInt())
                                     }
                                     showPlayerPicker = false
                                 },
@@ -116,7 +117,7 @@ fun DraftRoomScreen(
         } else if (draftState == null) {
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("⚠️ Server Not Available", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text("⚠️ Server Not Available", fontSize = screenConfig.headingTextSize, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Draft Room requires the Laravel backend to be running.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -200,7 +201,7 @@ private fun DraftStatusBar(state: DraftStateData, isAdmin: Boolean, viewModel: D
                 val minutes = remaining / 60
                 val seconds = remaining % 60
                 val timerColor = if (remaining <= 10) Color(0xFFFF5252) else Color.White
-                Text("⏱ ${minutes}:${String.format("%02d", seconds)}", color = timerColor, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("⏱ ${minutes}:${String.format("%02d", seconds)}", color = timerColor, fontSize = screenConfig.scoreTextSize, fontWeight = FontWeight.ExtraBold)
             }
 
             // Summary

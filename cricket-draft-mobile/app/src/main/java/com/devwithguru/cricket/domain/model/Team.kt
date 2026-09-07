@@ -7,6 +7,7 @@ package com.devwithguru.cricket.domain.model
 data class Team(
     // ── Identity ──
     val id: String,
+    val serverId: Int? = null,
     val name: String,
     val shortName: String = "",
 

@@ -41,6 +41,7 @@ fun MyTournamentsScreen(
 
     LaunchedEffect(Unit) { viewModel.loadAllTournaments() }
     val allTournaments by viewModel.tournaments.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     
     val filteredTournaments = allTournaments.filter { tournament ->
         val matchesSearch = tournament.name.contains(searchQuery, ignoreCase = true) ||
@@ -186,7 +187,16 @@ fun MyTournamentsScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Scrollable List
-                if (sortedTournaments.isEmpty()) {
+                if (isLoading && sortedTournaments.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (sortedTournaments.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()

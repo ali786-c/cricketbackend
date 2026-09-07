@@ -1,18 +1,23 @@
 package com.devwithguru.cricket.ui.feature.player
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,9 +41,9 @@ fun PlayerMatchesTab(
 ) {
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
     val allFixtures by viewModel.fixtures.collectAsState()
-    val liveMatches = allFixtures.filter { it.status == "Live" }
-    val scheduledMatches = allFixtures.filter { it.status == "Scheduled" }
-    val completedMatches = allFixtures.filter { it.status == "Completed" }
+    val liveMatches = allFixtures.filter { it.status.lowercase() == "live" }
+    val scheduledMatches = allFixtures.filter { it.status.lowercase() == "scheduled" || it.status.lowercase() == "upcoming" }
+    val completedMatches = allFixtures.filter { it.status.lowercase() == "completed" }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -58,6 +63,29 @@ fun PlayerMatchesTab(
             }
 
             items(liveMatches) { fixture ->
+                val homeName = fixture.homeTeam
+                val awayName = fixture.awayTeam
+                val matchId = fixture.id
+
+                val homeScoreText = remember(fixture) {
+                    if (fixture.currentInnings == 2) {
+                        fixture.firstInningsRuns?.let { r ->
+                            val w = fixture.firstInningsWickets ?: 0
+                            "$r-$w"
+                        } ?: ""
+                    } else {
+                        "${fixture.currentRuns}-${fixture.currentWickets} (${fixture.oversBowled})"
+                    }
+                }
+
+                val awayScoreText = remember(fixture) {
+                    if (fixture.currentInnings == 2) {
+                        "${fixture.currentRuns}-${fixture.currentWickets} (${fixture.oversBowled})"
+                    } else {
+                        "Yet to bat"
+                    }
+                }
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -66,58 +94,137 @@ fun PlayerMatchesTab(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Header Row: Round, Date + Status Badge
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val dateText = fixture.date.take(15)
                             Text(
-                                text = "${fixture.homeTeam} vs ${fixture.awayTeam}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
+                                text = "Match • Club Cricket • $dateText",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
                             )
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = StatusLive.copy(alpha = 0.15f)
+
+                            Text(
+                                text = "LIVE",
+                                color = StatusLive,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Home Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = homeName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Text(
-                                    text = "LIVE",
-                                    color = StatusLive,
-                                    fontSize = 10.sp,
+                                    text = homeName,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            if (homeScoreText.isNotEmpty()) {
+                                Text(
+                                    text = homeScoreText,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
 
-                        val inningsLabel = if (fixture.currentInnings == 2) " (2nd Innings)" else " (1st Innings)"
-                        Text(
-                            text = "Score: ${fixture.currentRuns}/${fixture.currentWickets} (${fixture.oversBowled} ov)$inningsLabel",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = "${fixture.overs} Overs • ${fixture.matchType} • ${fixture.ballType}",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontSize = 11.sp
-                        )
-
-                        Button(
-                            onClick = { onStartScheduledMatch?.invoke(fixture) },
-                            modifier = Modifier.fillMaxWidth().height(38.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = StatusLive, contentColor = Color.White)
+                        // Away Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("RESUME SCORING", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = awayName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = awayName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            if (awayScoreText.isNotEmpty()) {
+                                Text(
+                                    text = awayScoreText,
+                                    color = if (awayScoreText == "Yet to bat") MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        // Footer Divider + Venue
+                        val venueText = fixture.venue
+                        if (venueText.isNotBlank()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = venueText,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "RESUME SCORING",
+                                    color = StatusLive,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.clickable { onStartScheduledMatch?.invoke(fixture) }
+                                )
+                            }
                         }
                     }
                 }
@@ -138,6 +245,10 @@ fun PlayerMatchesTab(
             }
 
             items(scheduledMatches) { fixture ->
+                val homeName = fixture.homeTeam
+                val awayName = fixture.awayTeam
+                val matchId = fixture.id
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -146,75 +257,119 @@ fun PlayerMatchesTab(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Header Row: Round, Date + Status Badge
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val dateText = fixture.date.take(15)
                             Text(
-                                text = "${fixture.homeTeam} vs ${fixture.awayTeam}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
+                                text = "Match • Club Cricket • $dateText",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
                             )
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = StatusUpcoming.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "Scheduled",
-                                    color = StatusUpcoming,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
+
+                            Text(
+                                text = "SCHEDULED",
+                                color = StatusUpcoming,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
-                        Text(
-                            text = "${fixture.date} • ${fixture.time}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
-                        )
-
-                        Text(
-                            text = "${fixture.overs} Overs • ${fixture.matchType} • ${fixture.ballType}",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontSize = 11.sp
-                        )
-
-                        if (fixture.venue.isNotBlank()) {
+                        // Home Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(12.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = homeName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Text(
-                                    text = fixture.venue,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    fontSize = 11.sp
+                                    text = homeName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
 
-                        Button(
-                            onClick = { onStartScheduledMatch?.invoke(fixture) },
-                            modifier = Modifier.fillMaxWidth().height(38.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                        // Away Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("START MATCH", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = awayName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = awayName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        // Footer Divider + Venue
+                        val venueText = fixture.venue
+                        if (venueText.isNotBlank()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = venueText,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "START MATCH",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.clickable { onStartScheduledMatch?.invoke(fixture) }
+                                )
+                            }
                         }
                     }
                 }
@@ -345,6 +500,29 @@ fun PlayerMatchesTab(
             }
 
             items(completedMatches) { fixture ->
+                val homeName = fixture.homeTeam
+                val awayName = fixture.awayTeam
+                val matchId = fixture.id
+
+                val homeScoreText = remember(fixture) {
+                    if (fixture.currentInnings == 2) {
+                        fixture.firstInningsRuns?.let { r ->
+                            val w = fixture.firstInningsWickets ?: 0
+                            "$r-$w"
+                        } ?: ""
+                    } else {
+                        "${fixture.currentRuns}-${fixture.currentWickets} (${fixture.oversBowled})"
+                    }
+                }
+
+                val awayScoreText = remember(fixture) {
+                    if (fixture.currentInnings == 2) {
+                        "${fixture.currentRuns}-${fixture.currentWickets} (${fixture.oversBowled})"
+                    } else {
+                        "Yet to bat"
+                    }
+                }
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -353,32 +531,138 @@ fun PlayerMatchesTab(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Header Row: Round, Date + Status Badge
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val dateText = fixture.date.take(15)
                             Text(
-                                text = "${fixture.homeTeam} vs ${fixture.awayTeam}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
+                                text = "Match • Club Cricket • $dateText",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
                             )
+
                             Text(
-                                text = fixture.date,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp
+                                text = "COMPLETED",
+                                color = Color(0xFF4CAF50),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Text(
-                            text = "Score: ${fixture.currentRuns}/${fixture.currentWickets} (${fixture.oversBowled} ov) - Completed",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+
+                        // Home Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = homeName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = homeName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            if (homeScoreText.isNotEmpty()) {
+                                Text(
+                                    text = homeScoreText,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        // Away Team Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = awayName.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = awayName,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            if (awayScoreText.isNotEmpty()) {
+                                Text(
+                                    text = awayScoreText,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        // Footer Divider + Venue
+                        val venueText = fixture.venue
+                        if (venueText.isNotBlank()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = venueText,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "VIEW SCORECARD",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.clickable { onStartScheduledMatch?.invoke(fixture) }
+                                )
+                            }
+                        }
                     }
                 }
             }

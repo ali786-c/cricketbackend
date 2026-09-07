@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 data class TournamentEntity(
     @PrimaryKey
     val id: String,
+    val serverId: Int? = null,
     val name: String,
 
     // ── Basic Info (PRD §6.1) ──
@@ -32,6 +33,7 @@ data class TournamentEntity(
     // ── Game Format (PRD §7 / §48) ──
     val ballType: String = "Tennis Ball",
     val oversPerInnings: Int = 20,
+    val wicketsPerTeam: Int = 10,
 
     // ── Competition Structure (PRD §48) ──
     val competitionStructure: String = "League",
@@ -49,5 +51,8 @@ data class TournamentEntity(
     val status: String = "upcoming",
 
     // ── Stats ──
-    val teamCount: Int = 0
+    val teamCount: Int = 0,
+
+    // ── Sync ──
+    val updatedAt: Long = System.currentTimeMillis()
 )

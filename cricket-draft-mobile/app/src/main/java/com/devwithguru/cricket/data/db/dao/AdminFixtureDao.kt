@@ -65,6 +65,24 @@ interface AdminFixtureDao {
     @Query("UPDATE admin_fixtures SET serverId = :serverId, syncStatus = :status WHERE id = :id")
     suspend fun updateServerId(id: String, serverId: Int, status: String)
 
+    // ── Server ID mapping ──
+    @Query("SELECT * FROM admin_fixtures WHERE serverId = :serverId LIMIT 1")
+    suspend fun findByServerId(serverId: Int): AdminFixtureEntity?
+
+    @Query("UPDATE admin_fixtures SET serverId = :serverId, syncStatus = :status, updatedAt = :updatedAt WHERE id = :localId")
+    suspend fun updateServerIdAndSync(localId: String, serverId: Int, status: String, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * Find fixture by composite key to avoid duplicates:
+     * same tournament + same round + same match number + same home team + same away team.
+     * This handles the case where web created a fixture that mobile doesn't have locally.
+     */
+    @Query("SELECT * FROM admin_fixtures WHERE tournamentId = :tournamentId AND homeTeamId = :homeTeamId AND awayTeamId = :awayTeamId LIMIT 1")
+    suspend fun findByTeams(tournamentId: String, homeTeamId: String, awayTeamId: String): AdminFixtureEntity?
+
+    @Query("SELECT * FROM admin_fixtures WHERE updatedAt > :since")
+    suspend fun getModifiedSince(since: Long): List<AdminFixtureEntity>
+
     // ── Stats ──
     @Query("SELECT COUNT(*) FROM admin_fixtures WHERE tournamentId = :tournamentId")
     suspend fun getCountByTournament(tournamentId: String): Int

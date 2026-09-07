@@ -7,6 +7,7 @@ package com.devwithguru.cricket.domain.model
 data class Fixture(
     // ── Identity ──
     val id: String,
+    val serverId: Int? = null,
     val tournamentId: String,
 
     // ── Stage Context ──
@@ -43,5 +44,13 @@ data class Fixture(
     val tossDecision: String? = null,
 
     // ── Sync ──
-    val syncStatus: String = "synced"
+    val syncStatus: String = "synced",
+
+    // ── Live Scores ──
+    val currentInnings: Int? = null,
+    val currentRuns: Int? = null,
+    val currentWickets: Int? = null,
+    val oversBowled: String? = null,
+    val firstInningsRuns: Int? = null,
+    val firstInningsWickets: Int? = null
 )

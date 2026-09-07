@@ -98,8 +98,18 @@ fun PlayerProfileScreen(
                     )
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                ScrollableTabRow(
+            val isLoading by viewModel.isLoading.collectAsState()
+
+            if (isLoading || registeredPlayer == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -150,6 +160,7 @@ fun PlayerProfileScreen(
                         4 -> PlayerTournamentsTab(teams = playerTeams)
                     }
                 }
+            }
             }
         }
     }

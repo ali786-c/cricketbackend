@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +41,16 @@ fun TeamDetailScreen(
 
     // Creator state collected from ViewModel
     val isCreator by viewModel.isCreator.collectAsState()
+    
+    val error by viewModel.error.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(error) {
+        if (error != null) {
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -98,8 +110,18 @@ fun TeamDetailScreen(
                     )
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                ScrollableTabRow(
+            val isLoading by viewModel.isLoading.collectAsState()
+
+            if (isLoading || currentTeam == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -161,6 +183,7 @@ fun TeamDetailScreen(
                         4 -> TeamStatsTab(team = currentTeam, squad = squad)
                     }
                 }
+            }
             }
         }
     }

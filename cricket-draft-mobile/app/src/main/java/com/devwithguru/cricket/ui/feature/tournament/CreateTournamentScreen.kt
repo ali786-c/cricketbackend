@@ -70,7 +70,7 @@ fun CreateTournamentScreen(
                 organizerName = organizerName, contactInfo = contactInfo,
                 city = city, venue = venue, season = season,
                 startDate = startDate, endDate = endDate,
-                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20,
+                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20, wicketsPerTeam = (squadSize.toIntOrNull() ?: 11) - 1,
                 competitionStructure = competitionStructure, visibility = visibility,
                 hasDraft = hasDraft, squadSize = squadSize.toIntOrNull() ?: 11,
                 pickDuration = pickDuration.toIntOrNull() ?: 60, status = "upcoming"
@@ -89,7 +89,7 @@ fun CreateTournamentScreen(
                 organizerName = organizerName, contactInfo = contactInfo,
                 city = city, venue = venue, season = season,
                 startDate = startDate, endDate = endDate,
-                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20,
+                ballType = ballType, oversPerInnings = oversPerInnings.toIntOrNull() ?: 20, wicketsPerTeam = (squadSize.toIntOrNull() ?: 11) - 1,
                 competitionStructure = competitionStructure, visibility = visibility,
                 hasDraft = hasDraft, squadSize = squadSize.toIntOrNull() ?: 11,
                 pickDuration = pickDuration.toIntOrNull() ?: 60, status = "upcoming"

@@ -5,6 +5,7 @@ import com.devwithguru.cricket.domain.model.Team
 
 fun TeamEntity.toDomain() = Team(
     id = id,
+    serverId = serverId,
     name = name,
     shortName = shortName,
     tournamentId = tournamentId,
@@ -22,6 +23,7 @@ fun TeamEntity.toDomain() = Team(
 
 fun Team.toEntity() = TeamEntity(
     id = id,
+    serverId = id.toIntOrNull(),
     name = name,
     shortName = shortName,
     tournamentId = tournamentId,

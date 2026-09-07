@@ -29,6 +29,9 @@ class LineupViewModel @Inject constructor(
     private val _awaySquad = MutableStateFlow<List<PlayerSelectable>>(emptyList())
     val awaySquad: StateFlow<List<PlayerSelectable>> = _awaySquad
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
     private val _searchResult = MutableStateFlow<RegisteredPlayer?>(null)
     val searchResult: StateFlow<RegisteredPlayer?> = _searchResult
 
@@ -41,6 +44,7 @@ class LineupViewModel @Inject constructor(
         private set
 
     fun loadSquadsForMatch(matchId: String) {
+        _isLoading.value = true
         _homeSquad.value = emptyList()
         _awaySquad.value = emptyList()
         _squadSize.value = 11
@@ -59,7 +63,10 @@ class LineupViewModel @Inject constructor(
                 
                 playerRepository.getPlayersByTeam(originalHomeId).collect { list ->
                     _homeSquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                    _isLoading.value = false
                 }
+            } else {
+                _isLoading.value = false
             }
         }
         viewModelScope.launch {
@@ -71,7 +78,10 @@ class LineupViewModel @Inject constructor(
                 awayTeamId = originalAwayId
                 playerRepository.getPlayersByTeam(originalAwayId).collect { list ->
                     _awaySquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                    _isLoading.value = false
                 }
+            } else {
+                _isLoading.value = false
             }
         }
     }

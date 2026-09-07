@@ -31,4 +31,10 @@ class NavigationViewModel : ViewModel() {
             navigationStack[index] = newScreen
         }
     }
+
+    fun removeTossAndLineup() {
+        navigationStack.removeAll { screen ->
+            screen is Screen.Toss || screen is Screen.TossLineup
+        }
+    }
 }
