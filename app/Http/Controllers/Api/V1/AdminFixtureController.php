@@ -17,7 +17,7 @@ class AdminFixtureController extends Controller
 
     public function index(Tournament $tournament): JsonResponse
     {
-        return response()->json(['data' => $tournament->fixtures()->with(['homeTeam', 'awayTeam', 'match'])->paginate(20)]);
+        return response()->json(['data' => $tournament->fixtures()->with(['homeTeam', 'awayTeam', 'match'])->get()]);
     }
 
     public function store(Request $request, Tournament $tournament): JsonResponse
