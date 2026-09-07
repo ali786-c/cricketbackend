@@ -34,9 +34,13 @@ import com.devwithguru.cricket.data.db.entity.StageEntity
 import com.devwithguru.cricket.data.db.entity.SyncStatusEntity
 import com.devwithguru.cricket.data.db.entity.PendingChangeEntity
 import com.devwithguru.cricket.data.db.entity.PendingDeliveryEntity
+import com.devwithguru.cricket.data.db.entity.UserProfileEntity
+import com.devwithguru.cricket.data.db.entity.PlayerStatsEntity
 import com.devwithguru.cricket.data.db.dao.SyncStatusDao
 import com.devwithguru.cricket.data.db.dao.PendingChangeDao
 import com.devwithguru.cricket.data.db.dao.PendingDeliveryDao
+import com.devwithguru.cricket.data.db.dao.UserProfileDao
+import com.devwithguru.cricket.data.db.dao.PlayerStatsDao
 
 @Database(
     entities = [
@@ -56,9 +60,11 @@ import com.devwithguru.cricket.data.db.dao.PendingDeliveryDao
         AdminPlayerEntity::class,
         AdminFixtureEntity::class,
         AdminDraftSetupEntity::class,
-        StageEntity::class
+        StageEntity::class,
+        UserProfileEntity::class,
+        PlayerStatsEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -80,4 +86,6 @@ abstract class CricketDatabase : RoomDatabase() {
     abstract fun adminFixtureDao(): AdminFixtureDao
     abstract fun adminDraftSetupDao(): AdminDraftSetupDao
     abstract fun stageDao(): StageDao
+    abstract fun userProfileDao(): UserProfileDao
+    abstract fun playerStatsDao(): PlayerStatsDao
 }

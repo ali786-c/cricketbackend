@@ -2,19 +2,22 @@ package com.devwithguru.cricket.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.devwithguru.cricket.data.repository.PlayerRepository
-import com.devwithguru.cricket.data.repository.TeamRepository
-import com.devwithguru.cricket.data.repository.TournamentRepository
-import com.devwithguru.cricket.data.repository.FixtureRepository
-import com.devwithguru.cricket.domain.model.RegisteredPlayer
-import com.devwithguru.cricket.domain.model.Team
-import com.devwithguru.cricket.domain.model.Tournament
-import com.devwithguru.cricket.domain.model.ScheduledFixture
+import com.devwithguru.cricket.data.api.SearchData
+import com.devwithguru.cricket.data.repository.SearchApiRepository
+import com.devwithguru.cricket.data.sync.ConnectivityMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * A single search result shown on the GlobalSearchScreen.
+ * [id] is the SERVER id — result rows always point at server entities.
+ */
 data class SearchItem(
     val id: String,
     val type: String, // "player", "team", "tournament", "match"
@@ -22,210 +25,231 @@ data class SearchItem(
     val subtitle: String
 )
 
+/**
+ * Filter chips on the search screen. [apiType] maps to the backend
+ * `type` query param; null means "search everything".
+ */
+enum class SearchFilter(val label: String, val apiType: String?) {
+    ALL("All", null),
+    PLAYERS("Players", "players"),
+    TEAMS("Teams", "teams"),
+    TOURNAMENTS("Tournaments", "tournaments"),
+    MATCHES("Matches", "matches")
+}
+
+/**
+ * Online-only unified search.
+ *
+ * Every query hits GET /api/v1/search directly — results always come from the
+ * server, so entities that were never synced locally are still findable.
+ * When the device is offline the screen shows an explicit offline state; there
+ * is intentionally NO local fallback.
+ */
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val playerRepository: PlayerRepository,
-    private val teamRepository: TeamRepository,
-    private val tournamentRepository: TournamentRepository,
-    private val fixtureRepository: FixtureRepository
+    private val searchApiRepository: SearchApiRepository,
+    private val connectivityMonitor: ConnectivityMonitor
 ) : ViewModel() {
 
-    // Unified search results
-    private val _searchResults = MutableStateFlow<List<SearchItem>>(emptyList())
-    val searchResults: StateFlow<List<SearchItem>> = _searchResults
-
-    // Loading state
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
-
-    // Search query
     private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // All data caches
-    private val _allPlayers = MutableStateFlow<List<RegisteredPlayer>>(emptyList())
-    private val _allTeams = MutableStateFlow<List<Team>>(emptyList())
-    private val _allTournaments = MutableStateFlow<List<Tournament>>(emptyList())
-    private val _allFixtures = MutableStateFlow<List<ScheduledFixture>>(emptyList())
+    private val _searchResults = MutableStateFlow<List<SearchItem>>(emptyList())
+    val searchResults: StateFlow<List<SearchItem>> = _searchResults.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _selectedFilter = MutableStateFlow(SearchFilter.ALL)
+    val selectedFilter: StateFlow<SearchFilter> = _selectedFilter.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    /** Drives the "you're offline — search needs internet" state on the screen. */
+    private val _isOffline = MutableStateFlow(false)
+    val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
+
+    private var searchJob: Job? = null
 
     init {
-        loadAllData()
-    }
-
-    private fun loadAllData() {
+        // Keep the offline flag in sync so the UI reacts when connectivity changes
+        // (e.g. user toggles airplane mode while the search screen is open).
         viewModelScope.launch {
-            _isLoading.value = true
-
-            // Load all players
-            playerRepository.getAllPlayers().collect { players ->
-                _allPlayers.value = players
-            }
-        }
-
-        viewModelScope.launch {
-            // Load all teams
-            teamRepository.getAllTeams().collect { teams ->
-                _allTeams.value = teams
-            }
-        }
-
-        viewModelScope.launch {
-            // Load all tournaments
-            tournamentRepository.getAllTournaments().collect { tournaments ->
-                _allTournaments.value = tournaments
-            }
-        }
-
-        viewModelScope.launch {
-            // Load all fixtures
-            fixtureRepository.getAllFixtures().collect { fixtures ->
-                _allFixtures.value = fixtures
+            connectivityMonitor.isOnline.collect { online ->
+                _isOffline.value = !online
             }
         }
     }
 
-    fun search(query: String) {
+    fun onQueryChanged(query: String) {
         _searchQuery.value = query
+        searchJob?.cancel()
 
-        if (query.isBlank()) {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) {
+            // Backend requires min 2 chars — don't fire a request that can't succeed.
             _searchResults.value = emptyList()
+            _errorMessage.value = null
+            _isLoading.value = false
             return
         }
 
-        viewModelScope.launch {
-            val results = mutableListOf<SearchItem>()
-
-            // Search players
-            _allPlayers.value.forEach { player ->
-                if (player.name.contains(query, ignoreCase = true) ||
-                    player.role.contains(query, ignoreCase = true) ||
-                    player.city?.contains(query, ignoreCase = true) == true
-                ) {
-                    val teamName = _allTeams.value.find { it.id == player.teamId }?.name ?: "No team"
-                    results.add(
-                        SearchItem(
-                            id = player.id,
-                            type = "player",
-                            title = player.name,
-                            subtitle = "$teamName • ${player.role}"
-                        )
-                    )
-                }
-            }
-
-            // Search teams
-            _allTeams.value.forEach { team ->
-                if (team.name.contains(query, ignoreCase = true) ||
-                    team.shortName.contains(query, ignoreCase = true) ||
-                    team.teamCode.contains(query, ignoreCase = true)
-                ) {
-                    results.add(
-                        SearchItem(
-                            id = team.id,
-                            type = "team",
-                            title = team.name,
-                            subtitle = "Active • ${team.playerCount} players"
-                        )
-                    )
-                }
-            }
-
-            // Search tournaments
-            _allTournaments.value.forEach { tournament ->
-                if (tournament.name.contains(query, ignoreCase = true) ||
-                    tournament.city?.contains(query, ignoreCase = true) == true ||
-                    tournament.season.contains(query, ignoreCase = true)
-                ) {
-                    results.add(
-                        SearchItem(
-                            id = tournament.id,
-                            type = "tournament",
-                            title = tournament.name,
-                            subtitle = "${tournament.city ?: "Unknown"} • ${tournament.status}"
-                        )
-                    )
-                }
-            }
-
-            // Search fixtures/matches
-            _allFixtures.value.forEach { fixture ->
-                val homeTeam = _allTeams.value.find { it.id == fixture.homeTeam }
-                val awayTeam = _allTeams.value.find { it.id == fixture.awayTeam }
-                val homeName = homeTeam?.name ?: "Unknown"
-                val awayName = awayTeam?.name ?: "Unknown"
-
-                if (homeName.contains(query, ignoreCase = true) ||
-                    awayName.contains(query, ignoreCase = true) ||
-                    fixture.venue.contains(query, ignoreCase = true)
-                ) {
-                    val status = when (fixture.status.lowercase()) {
-                        "live" -> "Live"
-                        "completed" -> "Completed"
-                        "toss_completed" -> "Toss Completed"
-                        "scheduled" -> "Scheduled"
-                        else -> fixture.status
-                    }
-                    results.add(
-                        SearchItem(
-                            id = fixture.id,
-                            type = "match",
-                            title = "$homeName vs $awayName",
-                            subtitle = "$status • ${fixture.venue}"
-                        )
-                    )
-                }
-            }
-
-            _searchResults.value = results.distinctBy { it.id }
+        if (!connectivityMonitor.isCurrentlyOnline()) {
+            // Online-only search: no local fallback, show offline state.
+            _isOffline.value = true
+            _searchResults.value = emptyList()
             _isLoading.value = false
+            return
         }
+
+        _isLoading.value = true
+        _errorMessage.value = null
+
+        searchJob = viewModelScope.launch {
+            delay(300) // debounce keystrokes before hitting the server
+            executeSearch(trimmed)
+        }
+    }
+
+    fun selectFilter(filter: SearchFilter) {
+        if (_selectedFilter.value == filter) return
+        _selectedFilter.value = filter
+
+        // Re-run the current query against the newly selected type.
+        val trimmed = _searchQuery.value.trim()
+        if (trimmed.length >= 2 && connectivityMonitor.isCurrentlyOnline()) {
+            searchJob?.cancel()
+            _isLoading.value = true
+            _errorMessage.value = null
+            searchJob = viewModelScope.launch { executeSearch(trimmed) }
+        }
+    }
+
+    fun retry() {
+        val trimmed = _searchQuery.value.trim()
+        if (trimmed.length < 2) return
+        searchJob?.cancel()
+        _isLoading.value = true
+        _errorMessage.value = null
+        searchJob = viewModelScope.launch { executeSearch(trimmed) }
     }
 
     fun clearSearch() {
+        searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _errorMessage.value = null
+        _isLoading.value = false
     }
 
-    // Load recent searches from persistent storage (simplified - just returns recent items)
-    fun getRecentSearches(): List<SearchItem> {
-        val recent = mutableListOf<SearchItem>()
+    private suspend fun executeSearch(query: String) {
+        val filter = _selectedFilter.value
+        val result = searchApiRepository.search(query = query, type = filter.apiType)
 
-        // Add recent players (top 3)
-        _allPlayers.value.take(3).forEach { player ->
-            recent.add(
-                SearchItem(
-                    id = player.id,
-                    type = "player",
-                    title = player.name,
-                    subtitle = player.role
+        // Ignore stale responses (user kept typing or switched filter mid-flight).
+        if (query != _searchQuery.value.trim() || filter != _selectedFilter.value) return
+
+        result.fold(
+            onSuccess = { data ->
+                _searchResults.value = mapResults(data, filter)
+                _errorMessage.value = null
+            },
+            onFailure = {
+                _searchResults.value = emptyList()
+                _errorMessage.value = if (!connectivityMonitor.isCurrentlyOnline()) {
+                    "You're offline — search needs an internet connection."
+                } else {
+                    "Couldn't reach the server. Please try again."
+                }
+            }
+        )
+        _isLoading.value = false
+    }
+
+    private fun mapResults(data: SearchData, filter: SearchFilter): List<SearchItem> {
+        val items = mutableListOf<SearchItem>()
+
+        if (filter == SearchFilter.ALL || filter == SearchFilter.PLAYERS) {
+            data.players.forEach { p ->
+                items.add(
+                    SearchItem(
+                        id = p.id.toString(),
+                        type = "player",
+                        title = p.full_name ?: "Unknown player",
+                        subtitle = listOfNotNull(
+                            p.playing_role?.takeIf { it.isNotBlank() },
+                            p.city?.takeIf { it.isNotBlank() },
+                            p.unique_code?.takeIf { it.isNotBlank() }
+                        ).joinToString(" • ").ifBlank { "Player" }
+                    )
                 )
-            )
+            }
         }
 
-        // Add recent teams (top 3)
-        _allTeams.value.take(3).forEach { team ->
-            recent.add(
-                SearchItem(
-                    id = team.id,
-                    type = "team",
-                    title = team.name,
-                    subtitle = "Team"
+        if (filter == SearchFilter.ALL || filter == SearchFilter.TEAMS) {
+            data.teams.forEach { t ->
+                items.add(
+                    SearchItem(
+                        id = t.id.toString(),
+                        type = "team",
+                        title = t.name ?: "Unknown team",
+                        subtitle = listOfNotNull(
+                            t.short_name?.takeIf { it.isNotBlank() && !it.equals(t.name, ignoreCase = true) },
+                            t.unique_code?.takeIf { it.isNotBlank() }
+                        ).joinToString(" • ").ifBlank { "Team" }
+                    )
                 )
-            )
+            }
         }
 
-        // Add recent tournaments (top 2)
-        _allTournaments.value.take(2).forEach { tournament ->
-            recent.add(
-                SearchItem(
-                    id = tournament.id,
-                    type = "tournament",
-                    title = tournament.name,
-                    subtitle = tournament.status
+        if (filter == SearchFilter.ALL || filter == SearchFilter.TOURNAMENTS) {
+            data.tournaments.forEach { t ->
+                items.add(
+                    SearchItem(
+                        // Backend binds tournament routes by SLUG (Tournament::getRouteKeyName),
+                        // so deep-links must carry the slug — a numeric id would 404.
+                        id = t.slug ?: t.id.toString(),
+                        type = "tournament",
+                        title = t.name ?: "Unknown tournament",
+                        subtitle = listOfNotNull(
+                            t.city?.takeIf { it.isNotBlank() },
+                            t.status?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() }
+                        ).joinToString(" • ").ifBlank { "Tournament" }
+                    )
                 )
-            )
+            }
         }
 
-        return recent
+        if (filter == SearchFilter.ALL || filter == SearchFilter.MATCHES) {
+            data.matches.forEach { m ->
+                val status = when (m.status?.lowercase()) {
+                    "live" -> "Live"
+                    "completed" -> "Completed"
+                    "scheduled" -> "Scheduled"
+                    "toss_completed" -> "Toss Completed"
+                    null -> ""
+                    else -> m.status.replaceFirstChar { it.uppercase() }
+                }
+                items.add(
+                    SearchItem(
+                        id = m.id.toString(),
+                        type = "match",
+                        title = "${m.home_team ?: "Unknown"} vs ${m.away_team ?: "Unknown"}",
+                        subtitle = listOfNotNull(
+                            m.tournament?.takeIf { it.isNotBlank() },
+                            status.takeIf { it.isNotBlank() }
+                        ).joinToString(" • ").ifBlank { "Match" }
+                    )
+                )
+            }
+        }
+
+        return items
+    }
+
+    override fun onCleared() {
+        searchJob?.cancel()
+        super.onCleared()
     }
 }

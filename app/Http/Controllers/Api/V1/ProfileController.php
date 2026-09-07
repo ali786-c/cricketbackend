@@ -20,19 +20,41 @@ class ProfileController extends Controller
             'full_name' => ['required', 'string', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
             'city' => ['nullable', 'string', 'max:100'],
-            'playing_role' => ['required', 'string', 'in:Batter,Bowler,All-rounder,Wicketkeeper'],
+            'playing_role' => ['nullable', 'string', 'in:Batter,Bowler,All-rounder,Wicketkeeper'],
             'batting_style' => ['nullable', 'string', 'max:100'],
             'bowling_style' => ['nullable', 'string', 'max:100'],
             'bio' => ['nullable', 'string', 'max:2000'],
+            'photo' => ['nullable', 'image', 'max:5120'], // 5MB max
         ]);
-        $profile = PlayerProfile::updateOrCreate(['user_id' => $request->user()->id], [...$data, 'is_active' => true]);
+
+        $profileData = collect($data)->except('photo')->toArray();
+
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('player-profiles', 'public');
+            $profileData['photo_path'] = asset('storage/' . $path);
+        }
+
+        $profile = PlayerProfile::updateOrCreate(['user_id' => $request->user()->id], [...$profileData, 'is_active' => true]);
         return response()->json(['data' => $this->payload($profile), 'message' => 'Player profile saved successfully.']);
     }
 
     private function payload(?PlayerProfile $profile): ?array
     {
         if (! $profile) return null;
-        return ['id' => $profile->id, 'full_name' => $profile->full_name, 'phone' => $profile->phone, 'city' => $profile->city, 'playing_role' => $profile->playing_role, 'batting_style' => $profile->batting_style, 'bowling_style' => $profile->bowling_style, 'bio' => $profile->bio, 'is_active' => $profile->is_active];
+        return [
+            'id' => $profile->id,
+            'user_id' => $profile->user_id,
+            'full_name' => $profile->full_name,
+            'phone' => $profile->phone,
+            'city' => $profile->city,
+            'playing_role' => $profile->playing_role,
+            'batting_style' => $profile->batting_style,
+            'bowling_style' => $profile->bowling_style,
+            'photo_path' => $profile->photo_path,
+            'bio' => $profile->bio,
+            'is_active' => (bool)$profile->is_active,
+            'updated_at' => $profile->updated_at?->toISOString()
+        ];
     }
 
     public function stats(Request $request, PlayerProfile $playerProfile, \App\Modules\Analytics\Services\PlayerProfileStatsService $statsService): JsonResponse

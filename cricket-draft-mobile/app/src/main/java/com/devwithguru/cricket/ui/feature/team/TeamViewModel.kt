@@ -181,15 +181,30 @@ class TeamViewModel @Inject constructor(
             }
         }
 
-        // Step 2: Background API refresh
+        // Step 2: Background API refresh (also handles server-only teams)
         apiRefreshJob = viewModelScope.launch {
             val id = teamRepository.resolveOriginalTeamId(idStr)
             try {
-                val result = teamApiRepository.getTeamPlayers(id)
-                result.onSuccess { players ->
+                val result = teamApiRepository.getTeamSquad(id)
+                result.onSuccess { squadData ->
+                    // Server fallback: if this team isn't stored locally (e.g. opened
+                    // from a server search result), cache it in Room so the header
+                    // renders and future loads resolve locally.
+                    if (teamRepository.getTeamById(id) == null) {
+                        val fetched = Team(
+                            id = id,
+                            serverId = id.toIntOrNull(),
+                            name = squadData.team_name ?: "Team",
+                            shortName = "",
+                            status = "approved",
+                            playerCount = squadData.squad.size
+                        )
+                        teamRepository.saveTeam(fetched)
+                        _currentTeam.value = fetched
+                    }
                     // Only overwrite if API returned a non-empty list (guard offline additions)
-                    if (players.isNotEmpty()) {
-                        _squad.value = players
+                    if (squadData.squad.isNotEmpty()) {
+                        _squad.value = squadData.squad
                     }
                 }
             } catch (_: Exception) {

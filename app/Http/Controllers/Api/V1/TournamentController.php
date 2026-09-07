@@ -30,7 +30,7 @@ class TournamentController extends Controller
     public function players(Tournament $tournament): JsonResponse
     {
         $this->ensurePublic($tournament);
-        return response()->json(['data' => $tournament->tournamentPlayers()->where('status', 'approved')->with('playerProfile')->get()->map(fn ($player) => ['id' => $player->id, 'full_name' => $player->playerProfile?->full_name, 'playing_role' => $player->playerProfile?->playing_role, 'city' => $player->playerProfile?->city])->values()]);
+        return response()->json(['data' => $tournament->tournamentPlayers()->where('status', 'approved')->with('playerProfile')->get()->map(fn ($player) => ['id' => $player->id, 'full_name' => $player->playerProfile?->full_name, 'playing_role' => $player->playerProfile?->playing_role, 'batting_style' => $player->playerProfile?->batting_style, 'bowling_style' => $player->playerProfile?->bowling_style, 'city' => $player->playerProfile?->city, 'photo_path' => $player->playerProfile?->photo_path])->values()]);
     }
 
     public function standings(Tournament $tournament): JsonResponse

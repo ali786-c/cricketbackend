@@ -74,7 +74,10 @@ data class TournamentPlayerData(
     val id: Int,
     val full_name: String?,
     val playing_role: String?,
-    val city: String?
+    val batting_style: String?,
+    val bowling_style: String?,
+    val city: String?,
+    val photo_path: String?
 )
 
 data class TournamentStandingsResponse2(

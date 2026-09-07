@@ -56,14 +56,17 @@ data class ProfileResponse(
 
 data class ProfileData(
     val id: Int,
+    val user_id: Int,
     val full_name: String?,
     val phone: String?,
     val city: String?,
     val playing_role: String?,
     val batting_style: String?,
     val bowling_style: String?,
+    val photo_path: String?,
     val bio: String?,
-    val is_active: Boolean
+    val is_active: Boolean,
+    val updated_at: String?
 )
 
 data class MessageResponse(

@@ -52,7 +52,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.v1.auth.logout-all');
         Route::get('profile', [ProfileController::class, 'show'])->name('api.v1.profile.show');
-        Route::patch('profile', [ProfileController::class, 'update'])->name('api.v1.profile.update');
+        Route::match(['post', 'patch'], 'profile', [ProfileController::class, 'update'])->name('api.v1.profile.update');
         Route::get('tournaments/{tournament}/registration', [RegistrationController::class, 'mine'])->name('api.v1.tournaments.registration.mine');
         Route::post('tournaments/{tournament}/registration', [RegistrationController::class, 'store'])->middleware('throttle:20,1')->name('api.v1.tournaments.registration.store');
         Route::get('tournaments/{tournament}/draft/state', [DraftController::class, 'state'])->middleware(['role:captain', 'permission:make draft pick', 'draft.enabled'])->name('api.v1.tournaments.draft.state');

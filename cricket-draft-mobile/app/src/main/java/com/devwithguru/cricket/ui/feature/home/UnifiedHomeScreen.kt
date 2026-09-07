@@ -28,13 +28,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.devwithguru.cricket.ui.components.PremiumMatchCard
+import com.devwithguru.cricket.ui.components.SyncStatusIndicator
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.devwithguru.cricket.ui.feature.player.PlayerMatchesViewModel
 import com.devwithguru.cricket.ui.feature.player.PlayerProfileViewModel
 import kotlinx.coroutines.launch
 import com.devwithguru.cricket.ui.theme.screenConfig
-import com.devwithguru.cricket.ui.viewmodels.SearchViewModel
+import com.devwithguru.cricket.data.sync.SyncStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +54,7 @@ fun UnifiedHomeScreen(
     onNavigateToMatchCenter: (matchId: String) -> Unit,
     onNavigateToRecentMatches: () -> Unit,
     onSearchClick: () -> Unit,
-    onLogout: () -> Unit,
-    searchViewModel: SearchViewModel = hiltViewModel()
+    onLogout: () -> Unit
 ) {
     var activeTab by remember { mutableStateOf("Hub") }
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
@@ -264,14 +264,6 @@ fun UnifiedHomeScreen(
                                 Icons.Filled.Search,
                                 contentDescription = "Search",
                                 tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = { searchViewModel.clearSearch() }) {
-                            Icon(
-                                Icons.Filled.Clear,
-                                contentDescription = "Clear Search",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(20.dp)
                             )
                         }
                     },

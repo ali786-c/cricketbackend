@@ -37,14 +37,39 @@ interface ApiService {
     ): Response<UserResponse>
 
     /**
-     * Update player profile.
-     * PATCH /api/v1/profile
+     * Update player profile (Multipart for image).
+     * POST /api/v1/profile
      */
-    @PATCH("api/v1/profile")
+    @retrofit2.http.Multipart
+    @POST("api/v1/profile")
     suspend fun updateProfile(
         @Header("Authorization") token: String,
-        @Body request: UpdateProfileRequest
+        @retrofit2.http.Part("full_name") fullName: okhttp3.RequestBody,
+        @retrofit2.http.Part("playing_role") playingRole: okhttp3.RequestBody?,
+        @retrofit2.http.Part("batting_style") battingStyle: okhttp3.RequestBody?,
+        @retrofit2.http.Part("bowling_style") bowlingStyle: okhttp3.RequestBody?,
+        @retrofit2.http.Part("city") city: okhttp3.RequestBody?,
+        @retrofit2.http.Part("bio") bio: okhttp3.RequestBody?,
+        @retrofit2.http.Part photo: okhttp3.MultipartBody.Part? = null
     ): Response<ProfileResponse>
+
+    // ─── Search Endpoints ──────────────────────────────────
+
+    /**
+     * Unified server-side search across players, teams, tournaments and matches.
+     * GET /api/v1/search?q=QUERY&type=players,teams&limit=20
+     *
+     * @param query search term (min 2 chars, enforced by backend)
+     * @param type  optional filter: "players" | "teams" | "tournaments" | "matches"
+     *              or comma-separated combination. Null = search everything.
+     * @param limit max results per type (1-50)
+     */
+    @GET("api/v1/search")
+    suspend fun search(
+        @retrofit2.http.Query("q") query: String,
+        @retrofit2.http.Query("type") type: String? = null,
+        @retrofit2.http.Query("limit") limit: Int = 20
+    ): Response<SearchResponse>
 
     // ─── Tournament Endpoints (Public) ─────────────────────
 
