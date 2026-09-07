@@ -34,6 +34,44 @@ class AdminPlayerController extends Controller
         return response()->json(['data' => $registration->fresh()->load('playerProfile.user'), 'message' => 'Player registration rejected.']);
     }
 
+    public function storeManual(Request $request, Tournament $tournament): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'role' => ['nullable', 'string', 'max:50'],
+            'city' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $profile = \App\Models\PlayerProfile::create([
+            'user_id' => null,
+            'full_name' => $data['name'],
+            'playing_role' => $data['role'] ?? null,
+            'city' => $data['city'] ?? null,
+            'is_guest' => true,
+            'is_active' => true,
+        ]);
+
+        $registration = $tournament->tournamentPlayers()->create([
+            'player_profile_id' => $profile->id,
+            'status' => 'approved',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'id' => $registration->id,
+                'player_profile_id' => $profile->id,
+                'unique_code' => $profile->unique_code,
+                'full_name' => $profile->full_name,
+                'playing_role' => $profile->playing_role,
+                'city' => $profile->city,
+                'status' => 'approved',
+            ],
+            'message' => 'Guest player created and approved successfully.'
+        ], 201);
+    }
+
     private function belongs(Tournament $tournament, TournamentPlayer $registration): void
     {
         abort_unless($registration->tournament_id === $tournament->id, 404);

@@ -85,6 +85,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('admin/tournaments/{tournament}/draft/remove-player', [AdminDraftController::class, 'removePlayer'])->middleware(['permission:control draft', 'throttle:60,1'])->name('api.v1.admin.draft.remove-player');
         Route::post('admin/tournaments/{tournament}/draft/reassign-player', [AdminDraftController::class, 'reassignPlayer'])->middleware(['permission:control draft', 'throttle:60,1'])->name('api.v1.admin.draft.reassign-player');
         Route::get('admin/tournaments/{tournament}/players', [AdminPlayerController::class, 'index'])->middleware('permission:manage tournaments')->name('api.v1.admin.players.index');
+        Route::post('admin/tournaments/{tournament}/players/manual', [AdminPlayerController::class, 'storeManual'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.players.manual.store');
         Route::post('admin/tournaments/{tournament}/players/{registration}/approve', [AdminPlayerController::class, 'approve'])->middleware(['permission:manage tournaments', 'throttle:60,1'])->name('api.v1.admin.players.approve');
         Route::post('admin/tournaments/{tournament}/players/{registration}/reject', [AdminPlayerController::class, 'reject'])->middleware(['permission:manage tournaments', 'throttle:60,1'])->name('api.v1.admin.players.reject');
         Route::get('admin/tournaments/{tournament}/fixtures', [AdminFixtureController::class, 'index'])->middleware('permission:manage tournaments')->name('api.v1.admin.fixtures.index');
