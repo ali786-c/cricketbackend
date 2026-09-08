@@ -34,7 +34,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('tournaments/{tournament}/standings', [TournamentController::class, 'standings'])->name('api.v1.tournaments.standings');
     Route::get('tournaments/{tournament}/standings/simulate', [TournamentController::class, 'simulateStandings'])->name('api.v1.tournaments.standings.simulate');
     Route::get('matches/{match}/state', [MatchController::class, 'state'])->name('api.v1.matches.state');
-    Route::get('tournaments/{tournament}/sync', [SyncController::class, 'tournament'])->name('api.v1.tournaments.sync');        Route::get('players/{playerProfile}/stats', [ProfileController::class, 'stats'])->name('api.v1.players.stats');
+    Route::get('tournaments/{tournament}/sync', [SyncController::class, 'tournament'])->name('api.v1.tournaments.sync');
+    Route::get('players/{playerProfile}', [ProfileController::class, 'showPlayer'])->name('api.v1.players.show');
+        Route::get('players/{playerProfile}/stats', [ProfileController::class, 'stats'])->name('api.v1.players.stats');
         Route::get('players/{playerProfile}/insights', [ProfileController::class, 'insights'])->name('api.v1.players.insights');
         Route::get('players/{playerProfile}/matches', [ProfileController::class, 'matches'])->name('api.v1.players.matches');
         Route::get('players/{playerProfile}/teams', [ProfileController::class, 'teams'])->name('api.v1.players.teams');

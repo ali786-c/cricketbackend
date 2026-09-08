@@ -57,6 +57,11 @@ class ProfileController extends Controller
         ];
     }
 
+    public function showPlayer(PlayerProfile $playerProfile): JsonResponse
+    {
+        return response()->json(['data' => $this->payload($playerProfile)]);
+    }
+
     public function stats(Request $request, PlayerProfile $playerProfile, \App\Modules\Analytics\Services\PlayerProfileStatsService $statsService): JsonResponse
     {
         $filters = $request->validate([
