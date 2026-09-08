@@ -29,10 +29,6 @@ class AuthController extends Controller
         ]);
 
         $user->assignRole(['player', 'admin']);
-        
-        $user->playerProfile()->create([
-            'full_name' => $validated['name'],
-        ]);
 
         $client = ! empty($validated['client_slug']) ? ApiClient::query()->where('slug', $validated['client_slug'])->first() : null;
         if ($validated['client_slug'] ?? false) {
