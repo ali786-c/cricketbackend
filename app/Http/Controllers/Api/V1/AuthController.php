@@ -12,6 +12,43 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
+    public function register(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'string', 'min:8'],
+            'device_name' => ['required', 'string', 'max:100'],
+            'client_slug' => ['nullable', 'string', 'exists:api_clients,slug'],
+        ]);
+
+        $user = \App\Models\User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $user->assignRole(['player', 'admin']);
+        
+        $user->playerProfile()->create([
+            'full_name' => $validated['name'],
+        ]);
+
+        $client = ! empty($validated['client_slug']) ? ApiClient::query()->where('slug', $validated['client_slug'])->first() : null;
+        if ($validated['client_slug'] ?? false) {
+            if (! $client || ! $client->is_active) throw ValidationException::withMessages(['client_slug' => 'This API client is disabled.']);
+            $client->update(['last_seen_at' => now()]);
+        }
+        $abilities = $user->getRoleNames()->map(fn ($role) => 'role:'.$role)->push('profile:read');
+        if ($client) $abilities->push('client:'.$client->slug);
+        $token = $user->createToken($validated['device_name'], $abilities->values()->all());
+
+        return response()->json([
+            'data' => $this->userPayload($user->load('playerProfile')),
+            'token' => $token->plainTextToken,
+            'token_type' => 'Bearer',
+        ], 201);
+    }
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([

@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\OrganizationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:api-auth')->name('api.v1.auth.register');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:api-auth')->name('api.v1.auth.login');
     Route::get('tournaments', [TournamentController::class, 'index'])->name('api.v1.tournaments.index');
     Route::get('tournaments/{tournament}', [TournamentController::class, 'show'])->name('api.v1.tournaments.show');

@@ -15,34 +15,36 @@ class AdminFixtureController extends Controller
     {
     }
 
-    public function index(Tournament $tournament): JsonResponse
+    public function index(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         return response()->json(['data' => $tournament->fixtures()->with(['homeTeam', 'awayTeam', 'match'])->get()]);
     }
 
     public function store(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $fixture = $this->fixtures->create($tournament, $this->validated($request), (int) $request->user()->id);
         return response()->json(['data' => $fixture->load(['homeTeam', 'awayTeam']), 'message' => 'Fixture created successfully.'], 201);
     }
 
     public function update(Request $request, Tournament $tournament, Fixture $fixture): JsonResponse
     {
-        $this->belongs($tournament, $fixture);
+        $this->belongs($tournament, $fixture, $request);
         $fixture = $this->fixtures->update($fixture, $this->validated($request), (int) $request->user()->id);
         return response()->json(['data' => $fixture, 'message' => 'Fixture updated successfully.']);
     }
 
     public function status(Request $request, Tournament $tournament, Fixture $fixture): JsonResponse
     {
-        $this->belongs($tournament, $fixture);
+        $this->belongs($tournament, $fixture, $request);
         $data = $request->validate(['status' => ['required', 'in:scheduled,in_progress,postponed,completed,cancelled']]);
         return response()->json(['data' => $this->fixtures->transition($fixture, $data['status'], (int) $request->user()->id)]);
     }
 
     public function createMatch(Request $request, Tournament $tournament, Fixture $fixture): JsonResponse
     {
-        $this->belongs($tournament, $fixture);
+        $this->belongs($tournament, $fixture, $request);
         $match = $this->fixtures->createMatch($fixture, (int) $request->user()->id);
         return response()->json(['data' => ['match_id' => $match->id, 'status' => $match->status], 'message' => 'Operational match created.'], 201);
     }
@@ -55,15 +57,21 @@ class AdminFixtureController extends Controller
     /**
      * Delete a fixture.
      */
-    public function destroy(Tournament $tournament, Fixture $fixture): JsonResponse
+    public function destroy(Request $request, Tournament $tournament, Fixture $fixture): JsonResponse
     {
-        $this->belongs($tournament, $fixture);
+        $this->belongs($tournament, $fixture, $request);
         $fixture->delete();
         return response()->json(['message' => 'Fixture deleted successfully.']);
     }
 
-    private function belongs(Tournament $tournament, Fixture $fixture): void
+    private function belongs(Tournament $tournament, Fixture $fixture, Request $request): void
     {
+        $this->authorizeCreator($tournament, $request);
         abort_unless($fixture->tournament_id === $tournament->id, 404);
+    }
+
+    private function authorizeCreator(Tournament $tournament, Request $request): void
+    {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage fixtures for tournaments you created.');
     }
 }

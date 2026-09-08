@@ -12,6 +12,7 @@ class AdminPlayerController extends Controller
 {
     public function index(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $query = $tournament->tournamentPlayers()->with('playerProfile.user')->latest();
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());
@@ -21,14 +22,14 @@ class AdminPlayerController extends Controller
 
     public function approve(Request $request, Tournament $tournament, TournamentPlayer $registration): JsonResponse
     {
-        $this->belongs($tournament, $registration);
+        $this->belongs($tournament, $registration, $request);
         $registration->update(['status' => 'approved', 'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'review_notes' => null]);
         return response()->json(['data' => $registration->fresh()->load('playerProfile.user'), 'message' => 'Player approved for this tournament.']);
     }
 
     public function reject(Request $request, Tournament $tournament, TournamentPlayer $registration): JsonResponse
     {
-        $this->belongs($tournament, $registration);
+        $this->belongs($tournament, $registration, $request);
         $data = $request->validate(['review_notes' => ['nullable', 'string', 'max:2000']]);
         $registration->update(['status' => 'rejected', 'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'review_notes' => $data['review_notes'] ?? null]);
         return response()->json(['data' => $registration->fresh()->load('playerProfile.user'), 'message' => 'Player registration rejected.']);
@@ -36,6 +37,7 @@ class AdminPlayerController extends Controller
 
     public function storeManual(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:50'],
@@ -72,8 +74,14 @@ class AdminPlayerController extends Controller
         ], 201);
     }
 
-    private function belongs(Tournament $tournament, TournamentPlayer $registration): void
+    private function belongs(Tournament $tournament, TournamentPlayer $registration, Request $request): void
     {
+        $this->authorizeCreator($tournament, $request);
         abort_unless($registration->tournament_id === $tournament->id, 404);
+    }
+
+    private function authorizeCreator(Tournament $tournament, Request $request): void
+    {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage players for tournaments you created.');
     }
 }

@@ -42,6 +42,7 @@ class Tournament extends Model
         'contact_info',
         'competition_structure',
         'tournament_code',
+        'creator_id',
     ];
 
     protected function casts(): array
@@ -94,6 +95,11 @@ class Tournament extends Model
     public function cricketRuleProfile(): BelongsTo
     {
         return $this->belongsTo(CricketRuleProfile::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
     }
 
     public function teams(): HasMany

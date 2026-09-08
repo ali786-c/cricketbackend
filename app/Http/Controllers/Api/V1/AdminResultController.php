@@ -16,11 +16,18 @@ class AdminResultController extends Controller
 
     public function submit(Request $request, CricketMatch $match): JsonResponse
     {
+        $this->authorizeCreator($match->tournament, $request);
         return response()->json(['data' => $this->results->submit($match, (int) $request->user()->id), 'message' => 'Match result submitted for approval.']);
     }
 
     public function approve(Request $request, CricketMatch $match): JsonResponse
     {
+        $this->authorizeCreator($match->tournament, $request);
         return response()->json(['data' => $this->results->approve($match, (int) $request->user()->id), 'message' => 'Match result approved and standings rebuilt.']);
+    }
+
+    private function authorizeCreator(\App\Models\Tournament $tournament, Request $request): void
+    {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage results for tournaments you created.');
     }
 }

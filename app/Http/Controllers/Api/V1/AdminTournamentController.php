@@ -14,9 +14,9 @@ use Illuminate\Validation\ValidationException;
 
 class AdminTournamentController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(['data' => Tournament::withCount(['teams', 'tournamentPlayers', 'fixtures', 'matches'])->latest()->paginate(20)]);
+        return response()->json(['data' => Tournament::where('creator_id', $request->user()->id)->withCount(['teams', 'tournamentPlayers', 'fixtures', 'matches'])->latest()->paginate(20)]);
     }
 
     public function store(Request $request): JsonResponse
@@ -32,6 +32,7 @@ class AdminTournamentController extends Controller
         $data['tournament_code'] = $request->input('tournament_code');
         $data['logo_path'] = $request->hasFile('logo') ? $request->file('logo')->store('tournaments', 'public') : null;
         $data['banner_path'] = $request->hasFile('banner') ? $request->file('banner')->store('tournaments', 'public') : null;
+        $data['creator_id'] = $request->user()->id;
         $tournament = Tournament::create(array_merge($data, ['status' => 'draft']));
         return response()->json(['data' => $tournament, 'message' => 'Tournament created successfully.'], 201);
     }
@@ -43,6 +44,8 @@ class AdminTournamentController extends Controller
 
     public function update(Request $request, Tournament $tournament): JsonResponse
     {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only modify tournaments you created.');
+
         $data = $this->validated($request, false);
         if ($tournament->draft && $tournament->draft->status !== 'setup') {
             foreach (['squad_size', 'cricket_rule_profile_id', 'default_overs_per_innings'] as $field) {
@@ -85,6 +88,8 @@ class AdminTournamentController extends Controller
 
     public function status(Request $request, Tournament $tournament): JsonResponse
     {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only modify tournaments you created.');
+
         $data = $request->validate(['status' => ['required', 'in:draft,registration,ready,live,completed,cancelled']]);
         $from = $tournament->status;
         $to = $data['status'];

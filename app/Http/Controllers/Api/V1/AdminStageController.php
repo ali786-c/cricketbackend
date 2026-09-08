@@ -13,8 +13,9 @@ class AdminStageController extends Controller
     /**
      * List stages for a tournament.
      */
-    public function index(Tournament $tournament): JsonResponse
+    public function index(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $stages = $tournament->stages()->orderBy('order')->get();
         return response()->json(['data' => $stages]);
     }
@@ -24,6 +25,7 @@ class AdminStageController extends Controller
      */
     public function store(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'type' => ['sometimes', 'string', 'in:points_table,league,knockout,match,series,qualifier,eliminator,quarter_final,semi_final,final,custom'],
@@ -52,9 +54,9 @@ class AdminStageController extends Controller
     /**
      * Show a single stage.
      */
-    public function show(Tournament $tournament, Stage $stage): JsonResponse
+    public function show(Request $request, Tournament $tournament, Stage $stage): JsonResponse
     {
-        abort_unless($stage->tournament_id === $tournament->id, 404);
+        $this->belongs($tournament, $stage, $request);
         return response()->json(['data' => $stage->load('fixtures')]);
     }
 
@@ -63,7 +65,7 @@ class AdminStageController extends Controller
      */
     public function update(Request $request, Tournament $tournament, Stage $stage): JsonResponse
     {
-        abort_unless($stage->tournament_id === $tournament->id, 404);
+        $this->belongs($tournament, $stage, $request);
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:100'],
@@ -88,9 +90,9 @@ class AdminStageController extends Controller
     /**
      * Delete a stage.
      */
-    public function destroy(Tournament $tournament, Stage $stage): JsonResponse
+    public function destroy(Request $request, Tournament $tournament, Stage $stage): JsonResponse
     {
-        abort_unless($stage->tournament_id === $tournament->id, 404);
+        $this->belongs($tournament, $stage, $request);
 
         // Check if stage has fixtures
         if ($stage->fixtures()->count() > 0) {
@@ -100,5 +102,16 @@ class AdminStageController extends Controller
         $stage->delete();
 
         return response()->json(['message' => 'Stage deleted successfully.']);
+    }
+
+    private function belongs(Tournament $tournament, Stage $stage, Request $request): void
+    {
+        $this->authorizeCreator($tournament, $request);
+        abort_unless($stage->tournament_id === $tournament->id, 404);
+    }
+
+    private function authorizeCreator(Tournament $tournament, Request $request): void
+    {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage stages for tournaments you created.');
     }
 }

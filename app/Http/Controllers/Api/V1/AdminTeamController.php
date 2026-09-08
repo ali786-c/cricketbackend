@@ -17,8 +17,9 @@ class AdminTeamController extends Controller
     /**
      * List teams for a tournament.
      */
-    public function index(Tournament $tournament): JsonResponse
+    public function index(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $teams = $tournament->teams()
             ->with('activeCaptain.user')
             ->withCount('draftPicks')
@@ -33,6 +34,7 @@ class AdminTeamController extends Controller
      */
     public function store(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'short_name' => ['nullable', 'string', 'max:10'],
@@ -63,8 +65,9 @@ class AdminTeamController extends Controller
     /**
      * Delete a team from a tournament.
      */
-    public function destroy(Tournament $tournament, Team $team): JsonResponse
+    public function destroy(Request $request, Tournament $tournament, Team $team): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         abort_unless($team->tournament_id === $tournament->id, 404);
 
         // Check if team has draft picks
@@ -87,6 +90,7 @@ class AdminTeamController extends Controller
      */
     public function assignCaptain(Request $request, Tournament $tournament, Team $team): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         abort_unless($team->tournament_id === $tournament->id, 404);
 
         $data = $request->validate([
@@ -138,8 +142,9 @@ class AdminTeamController extends Controller
     /**
      * Remove captain from a team.
      */
-    public function removeCaptain(Tournament $tournament, Team $team): JsonResponse
+    public function removeCaptain(Request $request, Tournament $tournament, Team $team): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         abort_unless($team->tournament_id === $tournament->id, 404);
 
         $revoked = $team->captainAssignments()
@@ -156,5 +161,10 @@ class AdminTeamController extends Controller
             'data' => $team->fresh('activeCaptain'),
             'message' => "Captain removed from {$team->name}.",
         ]);
+    }
+
+    private function authorizeCreator(Tournament $tournament, Request $request): void
+    {
+        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage teams for tournaments you created.');
     }
 }
