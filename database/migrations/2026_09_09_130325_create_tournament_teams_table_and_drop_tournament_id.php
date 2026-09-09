@@ -27,23 +27,11 @@ return new class extends Migration
         DB::statement('INSERT INTO tournament_teams (tournament_id, team_id, created_at, updated_at) SELECT tournament_id, id, created_at, updated_at FROM teams WHERE tournament_id IS NOT NULL');
 
         // 3. Drop foreign key and column from teams table
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique('teams_tournament_id_name_unique'); }); } catch (\Exception $e) {}
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique(['tournament_id', 'name']); }); } catch (\Exception $e) {}
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropForeign(['tournament_id']); }); } catch (\Exception $e) {}
+
         Schema::table('teams', function (Blueprint $table) {
-            // First drop unique constraint if it exists
-            $sm = Schema::getConnection()->getDoctrineSchemaManager();
-            $indexesFound = $sm->listTableIndexes('teams');
-            if(array_key_exists('teams_tournament_id_name_unique', $indexesFound)) {
-                $table->dropUnique('teams_tournament_id_name_unique');
-            }
-
-            // Drop foreign key if exists
-            $foreignKeys = $sm->listTableForeignKeys('teams');
-            foreach ($foreignKeys as $fk) {
-                if (in_array('tournament_id', $fk->getLocalColumns())) {
-                    $table->dropForeign($fk->getName());
-                }
-            }
-
-            // Drop column
             $table->dropColumn('tournament_id');
         });
     }
