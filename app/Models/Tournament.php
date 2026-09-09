@@ -102,9 +102,9 @@ class Tournament extends Model
         return $this->belongsTo(User::class, 'creator_id');
     }
 
-    public function teams(): HasMany
+    public function teams(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->hasMany(Team::class);
+        return $this->belongsToMany(Team::class, 'tournament_teams')->withTimestamps();
     }
 
     public function tournamentPlayers(): HasMany

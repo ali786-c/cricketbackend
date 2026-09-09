@@ -219,6 +219,8 @@ data class CaptainPickRequest(
 data class CreateFixtureRequest(
     val home_team_id: Int,
     val away_team_id: Int,
+    val home_team_name: String? = null,
+    val away_team_name: String? = null,
     val round_number: Int? = null,
     val round_name: String? = null,
     val match_number: Int? = null,

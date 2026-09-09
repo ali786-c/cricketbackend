@@ -43,18 +43,24 @@ class AdminTeamController extends Controller
             'wicketkeeper_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $team = Team::create([
-            'tournament_id' => $tournament->id,
-            'name' => $data['name'],
-            'short_name' => $data['short_name'] ?? strtoupper(Str::limit($data['name'], 3, '')),
-            'display_order' => $tournament->teams()->count() + 1,
-            'is_active' => true,
-            'status' => 'pending',
-            'vice_captain_name' => $data['vice_captain_name'] ?? null,
-            'manager_name' => $data['manager_name'] ?? null,
-            'wicketkeeper_name' => $data['wicketkeeper_name'] ?? null,
-            'creator_id' => $request->user()?->id,
-        ]);
+        $team = Team::firstOrCreate(
+            ['name' => $data['name']],
+            [
+                'short_name' => $data['short_name'] ?? strtoupper(Str::limit($data['name'], 3, '')),
+                'display_order' => $tournament->teams()->count() + 1,
+                'is_active' => true,
+                'status' => 'pending',
+                'vice_captain_name' => $data['vice_captain_name'] ?? null,
+                'manager_name' => $data['manager_name'] ?? null,
+                'wicketkeeper_name' => $data['wicketkeeper_name'] ?? null,
+                'creator_id' => $request->user()?->id,
+            ]
+        );
+
+        // Attach team to tournament if not already attached
+        if (!$tournament->teams()->where('teams.id', $team->id)->exists()) {
+            $tournament->teams()->attach($team->id);
+        }
 
         return response()->json([
             'data' => $team,

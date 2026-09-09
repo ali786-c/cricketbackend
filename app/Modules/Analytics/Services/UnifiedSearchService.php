@@ -154,11 +154,13 @@ class UnifiedSearchService
         }
 
         if ($tournamentId) {
-            $q->where('tournament_id', $tournamentId);
+            $q->whereHas('tournaments', function($query) use ($tournamentId) {
+                $query->where('tournaments.id', $tournamentId);
+            });
         }
 
         $results = $q->take($limit)
-            ->get(['id', 'unique_code', 'name', 'short_name', 'logo_path', 'tournament_id', 'is_active']);
+            ->get(['id', 'unique_code', 'name', 'short_name', 'logo_path', 'is_active']);
 
         return $results->map(fn($t) => $this->formatTeam($t))->toArray();
     }
@@ -263,7 +265,6 @@ class UnifiedSearchService
             'name' => $team->name,
             'short_name' => $team->short_name,
             'logo_path' => $team->logo_path,
-            'tournament_id' => $team->tournament_id,
             'is_active' => $team->is_active ?? true,
         ];
     }

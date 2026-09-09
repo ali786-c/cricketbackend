@@ -40,14 +40,42 @@ class CustomFixtureController extends Controller
     
     private function validated(Request $request): array
     {
-        // Simple validation rule that ignores tournament specific stuff
-        return $request->validate([
-            'home_team_id' => ['required', 'integer', 'exists:teams,id'],
-            'away_team_id' => ['required', 'integer', 'exists:teams,id', 'different:home_team_id'],
+        $data = $request->validate([
+            'home_team_id' => ['required', 'integer'],
+            'away_team_id' => ['required', 'integer'],
+            'home_team_name' => ['nullable', 'string', 'max:100'],
+            'away_team_name' => ['nullable', 'string', 'max:100'],
             'scheduled_at' => ['required', 'date'],
             'venue' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:50'],
             'timezone' => ['nullable', 'string', 'timezone'],
         ]);
+
+        // Auto-create global teams if ID is 0 and name is provided
+        if ($data['home_team_id'] === 0 && !empty($data['home_team_name'])) {
+            $team = \App\Models\Team::firstOrCreate(
+                ['name' => $data['home_team_name']],
+                ['is_active' => true, 'status' => 'pending', 'creator_id' => $request->user()?->id]
+            );
+            $data['home_team_id'] = $team->id;
+        }
+        
+        if ($data['away_team_id'] === 0 && !empty($data['away_team_name'])) {
+            $team = \App\Models\Team::firstOrCreate(
+                ['name' => $data['away_team_name']],
+                ['is_active' => true, 'status' => 'pending', 'creator_id' => $request->user()?->id]
+            );
+            $data['away_team_id'] = $team->id;
+        }
+
+        // Validate existence after creation
+        if (!\App\Models\Team::where('id', $data['home_team_id'])->exists()) {
+            abort(422, 'Invalid home team.');
+        }
+        if (!\App\Models\Team::where('id', $data['away_team_id'])->exists() || $data['home_team_id'] === $data['away_team_id']) {
+            abort(422, 'Invalid away team or teams are the same.');
+        }
+
+        return $data;
     }
 }

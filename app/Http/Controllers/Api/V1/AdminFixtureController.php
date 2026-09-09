@@ -51,7 +51,41 @@ class AdminFixtureController extends Controller
 
     private function validated(Request $request): array
     {
-        return $request->validate(['home_team_id' => ['required', 'integer'], 'away_team_id' => ['required', 'integer', 'different:home_team_id'], 'round_number' => ['nullable', 'integer', 'min:1', 'max:999'], 'round_name' => ['nullable', 'string', 'max:100'], 'match_number' => ['nullable', 'integer', 'min:1', 'max:9999'], 'scheduled_at' => ['required', 'date'], 'venue' => ['nullable', 'string', 'max:255'], 'city' => ['nullable', 'string', 'max:100'], 'timezone' => ['required', 'timezone'], 'notes' => ['nullable', 'string', 'max:2000']]);
+        $data = $request->validate([
+            'home_team_id' => ['required', 'integer'],
+            'away_team_id' => ['required', 'integer'],
+            'home_team_name' => ['nullable', 'string', 'max:100'],
+            'away_team_name' => ['nullable', 'string', 'max:100'],
+            'round_number' => ['nullable', 'integer', 'min:1', 'max:999'], 
+            'round_name' => ['nullable', 'string', 'max:100'], 
+            'match_number' => ['nullable', 'integer', 'min:1', 'max:9999'], 
+            'scheduled_at' => ['required', 'date'], 
+            'venue' => ['nullable', 'string', 'max:255'], 
+            'city' => ['nullable', 'string', 'max:100'], 
+            'timezone' => ['required', 'timezone'], 
+            'notes' => ['nullable', 'string', 'max:2000']
+        ]);
+
+        // Auto-create global teams if ID is 0 and name is provided
+        if ($data['home_team_id'] === 0 && !empty($data['home_team_name'])) {
+            $team = \App\Models\Team::firstOrCreate(
+                ['name' => $data['home_team_name']],
+                ['is_active' => true, 'status' => 'pending', 'creator_id' => $request->user()?->id]
+            );
+            $data['home_team_id'] = $team->id;
+        }
+        
+        if ($data['away_team_id'] === 0 && !empty($data['away_team_name'])) {
+            $team = \App\Models\Team::firstOrCreate(
+                ['name' => $data['away_team_name']],
+                ['is_active' => true, 'status' => 'pending', 'creator_id' => $request->user()?->id]
+            );
+            $data['away_team_id'] = $team->id;
+        }
+        
+        // Let FixtureService handle if these teams belong to the tournament or not
+
+        return $data;
     }
 
     /**

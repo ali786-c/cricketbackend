@@ -44,8 +44,29 @@ class AdminMatchController extends Controller
     public function playingXi(Request $request, Tournament $tournament, CricketMatch $match, int $team): JsonResponse
     {
         $this->belongs($tournament, $match, $request);
-        $data = $request->validate(['player_ids' => ['required', 'array'], 'player_ids.*' => ['integer']]);
-        return response()->json(['data' => $this->matches->submitPlayingXi($match, $team, $data['player_ids'], (int) $request->user()->id)]);
+        $data = $request->validate([
+            'player_ids' => ['required', 'array'], 
+            'player_ids.*' => ['integer'],
+            'new_players' => ['nullable', 'array'],
+            'new_players.*.name' => ['required', 'string', 'max:100'],
+            'new_players.*.role' => ['nullable', 'string', 'max:50']
+        ]);
+
+        $playerIds = $data['player_ids'];
+
+        if (!empty($data['new_players'])) {
+            foreach ($data['new_players'] as $newPlayer) {
+                $profile = \App\Models\PlayerProfile::create([
+                    'full_name' => $newPlayer['name'],
+                    'playing_role' => $newPlayer['role'] ?? null,
+                    'is_guest' => true,
+                    'is_active' => true,
+                ]);
+                $playerIds[] = $profile->id;
+            }
+        }
+
+        return response()->json(['data' => $this->matches->submitPlayingXi($match, $team, $playerIds, (int) $request->user()->id)]);
     }
 
     public function approveLineup(Request $request, Tournament $tournament, CricketMatch $match): JsonResponse

@@ -59,9 +59,9 @@ class Team extends Model
         return static::where('unique_code', $code)->first();
     }
 
-    public function tournament(): BelongsTo
+    public function tournaments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->belongsTo(Tournament::class);
+        return $this->belongsToMany(Tournament::class, 'tournament_teams')->withTimestamps();
     }
 
     public function captainAssignments(): HasMany

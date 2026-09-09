@@ -231,6 +231,8 @@ class SyncManager @Inject constructor(
                     match_number = (payload["matchNumber"] as? Number)?.toInt() ?: 1,
                     home_team_id = (payload["homeTeamId"] as? String)?.toIntOrNull() ?: 0,
                     away_team_id = (payload["awayTeamId"] as? String)?.toIntOrNull() ?: 0,
+                    home_team_name = payload["homeTeamName"] as? String,
+                    away_team_name = payload["awayTeamName"] as? String,
                     scheduled_at = (payload["scheduledAt"] as? String)
                         ?: run {
                             val date = payload["scheduledDate"] as? String ?: ""
