@@ -15,6 +15,7 @@ class MatchPlayer extends Model
         'match_id',
         'team_id',
         'tournament_player_id',
+        'player_profile_id',
         'draft_pick_id',
         'player_name_snapshot',
         'player_role_snapshot',
@@ -48,6 +49,11 @@ class MatchPlayer extends Model
     public function tournamentPlayer(): BelongsTo
     {
         return $this->belongsTo(TournamentPlayer::class);
+    }
+
+    public function playerProfile(): BelongsTo
+    {
+        return $this->belongsTo(PlayerProfile::class);
     }
 
     public function draftPick(): BelongsTo

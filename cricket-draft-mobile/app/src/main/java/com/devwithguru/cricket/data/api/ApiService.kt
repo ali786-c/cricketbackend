@@ -504,6 +504,12 @@ interface ApiService {
         @Body request: CreateFixtureRequest
     ): Response<AdminFixtureResponse>
 
+    @POST("api/v1/custom/fixtures")
+    suspend fun createCustomFixture(
+        @Header("Authorization") token: String,
+        @Body request: CreateFixtureRequest
+    ): Response<AdminFixtureResponse>
+
     /**
      * Update a fixture.
      * PUT /api/v1/admin/tournaments/{tournamentId}/fixtures/{fixtureId}

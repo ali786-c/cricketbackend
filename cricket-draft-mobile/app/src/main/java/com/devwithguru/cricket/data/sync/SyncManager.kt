@@ -222,7 +222,7 @@ class SyncManager @Inject constructor(
      * Push fixture create → server returns server ID → update local entity.
      */
     private suspend fun pushFixtureChange(change: PendingChangeEntity, payload: Map<*, *>, authHeader: String): Boolean {
-        val tournamentId = payload["tournamentId"] as? String ?: return false
+        val tournamentId = payload["tournamentId"] as? String ?: ""
         return when (change.action) {
             "create" -> {
                 val body = com.devwithguru.cricket.data.api.CreateFixtureRequest(
@@ -240,7 +240,13 @@ class SyncManager @Inject constructor(
                     venue = payload["venue"] as? String,
                     city = payload["city"] as? String
                 )
-                val response = apiService.createFixture(authHeader, tournamentId, body)
+                
+                val response = if (tournamentId.isEmpty() || tournamentId == "custom") {
+                    apiService.createCustomFixture(authHeader, body)
+                } else {
+                    apiService.createFixture(authHeader, tournamentId, body)
+                }
+                
                 if (response.isSuccessful) {
                     val serverId = response.body()?.data?.id
                     if (serverId != null) {

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AdminFixtureController;
+use App\Http\Controllers\Api\V1\CustomFixtureController;
+use App\Http\Controllers\Api\V1\CustomTeamController;
 use App\Http\Controllers\Api\V1\AdminMatchController;
 use App\Http\Controllers\Api\V1\AdminPlayerController;
 use App\Http\Controllers\Api\V1\AdminDraftController;
@@ -51,6 +53,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('organizations/{organization}', [OrganizationController::class, 'show'])->name('api.v1.organizations.show');
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::post('custom/teams', [CustomTeamController::class, 'store'])->name('api.v1.custom.teams.store');
+        Route::post('custom/fixtures', [CustomFixtureController::class, 'store'])->name('api.v1.custom.fixtures.store');
+        Route::put('custom/fixtures/{fixture}', [CustomFixtureController::class, 'update'])->name('api.v1.custom.fixtures.update');
+        Route::post('custom/fixtures/{fixture}/status', [CustomFixtureController::class, 'status'])->name('api.v1.custom.fixtures.status');
+        Route::post('custom/fixtures/{fixture}/create-match', [CustomFixtureController::class, 'createMatch'])->name('api.v1.custom.fixtures.create-match');
         Route::get('auth/me', [AuthController::class, 'me'])->name('api.v1.auth.me');
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.v1.auth.logout-all');

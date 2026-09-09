@@ -16,27 +16,33 @@ class FixtureService
     {
     }
 
-    public function create(Tournament $tournament, array $data, int $actorId): Fixture
+    public function create(?Tournament $tournament, array $data, int $actorId): Fixture
     {
         return $this->database->transaction(function () use ($tournament, $data, $actorId) {
-            $this->assertTournamentCanSchedule($tournament);
-            $teams = $this->teamsFor($tournament, (int) $data['home_team_id'], (int) $data['away_team_id']);
-            if (isset($data['match_number']) && Fixture::query()->where('tournament_id', $tournament->id)->where('match_number', $data['match_number'])->exists()) {
-                $this->fail('match_number', 'This match number is already assigned in the tournament.');
+            if ($tournament) {
+                $this->assertTournamentCanSchedule($tournament);
             }
-            $this->assertNoScheduleConflict($tournament, $teams[0]->id, $teams[1]->id, $data['scheduled_at']);
+            $teams = $this->teamsFor($tournament, (int) $data['home_team_id'], (int) $data['away_team_id']);
+            if (isset($data['match_number']) && $tournament) {
+                if (Fixture::query()->where('tournament_id', $tournament->id)->where('match_number', $data['match_number'])->exists()) {
+                    $this->fail('match_number', 'This match number is already assigned in the tournament.');
+                }
+            }
+            if ($tournament) {
+                $this->assertNoScheduleConflict($tournament, $teams[0]->id, $teams[1]->id, $data['scheduled_at']);
+            }
 
             return Fixture::create([
-                'tournament_id' => $tournament->id,
+                'tournament_id' => $tournament?->id,
                 'home_team_id' => $teams[0]->id,
                 'away_team_id' => $teams[1]->id,
                 'round_number' => $data['round_number'] ?? null,
                 'round_name' => $data['round_name'] ?? null,
                 'match_number' => $data['match_number'] ?? null,
-                'scheduled_at' => Carbon::parse($data['scheduled_at'], $data['timezone'] ?? $tournament->timezone ?: 'UTC')->utc(),
+                'scheduled_at' => Carbon::parse($data['scheduled_at'], $data['timezone'] ?? $tournament?->timezone ?: 'UTC')->utc(),
                 'venue' => $data['venue'] ?? null,
                 'city' => $data['city'] ?? null,
-                'timezone' => $data['timezone'] ?? $tournament->timezone ?: 'UTC',
+                'timezone' => $data['timezone'] ?? $tournament?->timezone ?: 'UTC',
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actorId,
@@ -53,10 +59,14 @@ class FixtureService
                 $this->fail('fixture', 'This fixture is locked after its operational match begins.');
             }
             $tournament = $fixture->tournament;
-            $this->assertTournamentCanSchedule($tournament);
+            if ($tournament) {
+                $this->assertTournamentCanSchedule($tournament);
+            }
             $teams = $this->teamsFor($tournament, (int) $data['home_team_id'], (int) $data['away_team_id']);
-            if (isset($data['match_number']) && Fixture::query()->where('tournament_id', $tournament->id)->where('match_number', $data['match_number'])->where('id', '<>', $fixture->id)->exists()) {
-                $this->fail('match_number', 'This match number is already assigned in the tournament.');
+            if (isset($data['match_number']) && $tournament) {
+                if (Fixture::query()->where('tournament_id', $tournament->id)->where('match_number', $data['match_number'])->where('id', '<>', $fixture->id)->exists()) {
+                    $this->fail('match_number', 'This match number is already assigned in the tournament.');
+                }
             }
             $fixture->update([
                 'home_team_id' => $teams[0]->id,
@@ -64,10 +74,10 @@ class FixtureService
                 'round_number' => $data['round_number'] ?? null,
                 'round_name' => $data['round_name'] ?? null,
                 'match_number' => $data['match_number'] ?? null,
-                'scheduled_at' => Carbon::parse($data['scheduled_at'], $data['timezone'] ?? $tournament->timezone ?: 'UTC')->utc(),
+                'scheduled_at' => Carbon::parse($data['scheduled_at'], $data['timezone'] ?? $tournament?->timezone ?: 'UTC')->utc(),
                 'venue' => $data['venue'] ?? null,
                 'city' => $data['city'] ?? null,
-                'timezone' => $data['timezone'] ?? $tournament->timezone ?: 'UTC',
+                'timezone' => $data['timezone'] ?? $tournament?->timezone ?: 'UTC',
                 'notes' => $data['notes'] ?? null,
                 'updated_by' => $actorId,
             ]);
@@ -102,12 +112,18 @@ class FixtureService
         return $match;
     }
 
-    private function teamsFor(Tournament $tournament, int $homeId, int $awayId): array
+    private function teamsFor(?Tournament $tournament, int $homeId, int $awayId): array
     {
         if ($homeId === $awayId) $this->fail('teams', 'A fixture requires two different teams.');
-        $teams = $tournament->teams()->whereIn('id', [$homeId, $awayId])->where('is_active', true)->get()->keyBy('id');
-        if ($teams->count() !== 2) $this->fail('teams', 'Both fixture teams must be active teams in this tournament.');
-        return [$teams->get($homeId), $teams->get($awayId)];
+        if ($tournament) {
+            $teams = $tournament->teams()->whereIn('id', [$homeId, $awayId])->where('is_active', true)->get()->keyBy('id');
+            if ($teams->count() !== 2) $this->fail('teams', 'Both fixture teams must be active teams in this tournament.');
+            return [$teams->get($homeId), $teams->get($awayId)];
+        } else {
+            $teams = Team::whereIn('id', [$homeId, $awayId])->get()->keyBy('id');
+            if ($teams->count() !== 2) $this->fail('teams', 'Both fixture teams must exist.');
+            return [$teams->get($homeId), $teams->get($awayId)];
+        }
     }
 
     private function assertNoScheduleConflict(Tournament $tournament, int $homeId, int $awayId, string $scheduledAt): void

@@ -109,7 +109,7 @@ class AuthViewModel @Inject constructor(
             // Fetch latest data (like player_profile_id) in background
             viewModelScope.launch {
                 try {
-                    authRepository.getMe()
+                    authRepository. getMe()
                 } catch (e: Exception) {
                     // Ignore errors, we are just trying to update the cache
                 }
@@ -129,6 +129,6 @@ class AuthViewModel @Inject constructor(
     }
 
     fun getToken(): String? = authRepository.getToken()
-    
+
     fun getPlayerProfileId(): Int = authRepository.getPlayerProfileId()
 }
