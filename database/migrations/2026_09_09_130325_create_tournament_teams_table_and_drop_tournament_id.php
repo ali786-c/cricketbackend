@@ -32,14 +32,17 @@ return new class extends Migration
 
         // 3. Drop foreign key and column from teams table
         try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique('teams_tournament_id_name_unique'); }); } catch (\Exception $e) {}
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique('teams_tournament_id_display_order_unique'); }); } catch (\Exception $e) {}
         try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique(['tournament_id', 'name']); }); } catch (\Exception $e) {}
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropUnique(['tournament_id', 'display_order']); }); } catch (\Exception $e) {}
         try { Schema::table('teams', function (Blueprint $table) { $table->dropForeign(['tournament_id']); }); } catch (\Exception $e) {}
+        try { Schema::table('teams', function (Blueprint $table) { $table->dropForeign('teams_tournament_id_foreign'); }); } catch (\Exception $e) {}
 
-        if (Schema::hasColumn('teams', 'tournament_id')) {
+        try {
             Schema::table('teams', function (Blueprint $table) {
                 $table->dropColumn('tournament_id');
             });
-        }
+        } catch (\Exception $e) {}
     }
 
     /**
