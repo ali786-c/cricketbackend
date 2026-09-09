@@ -69,9 +69,18 @@ class LineupViewModel @Inject constructor(
 
         viewModelScope.launch {
             val adminFixture = fixtureRepository.getAdminFixtureById(matchId)
-            val scheduledFixture = if (adminFixture == null) {
-                fixtureRepository.getScheduledFixtureById(matchId)
-            } else null
+            // Always fetch scheduled fixture to get custom wickets
+            val scheduledFixture = fixtureRepository.getScheduledFixtureById(matchId)
+
+            matchTournamentId = adminFixture?.tournamentId ?: "0"
+
+            val tournament = adminFixture?.tournamentId
+                ?.takeIf { it.isNotBlank() && it != "0" }
+                ?.let { tournamentRepository.getTournamentById(it) }
+
+            _squadSize.value = tournament?.squadSize
+                ?: scheduledFixture?.wickets?.plus(1)
+                ?: 11
 
             // Resolve BOTH team IDs before loading squads. Custom-match fixtures
             // store team NAMES with blank/placeholder IDs, so prefer the stored
@@ -92,14 +101,6 @@ class LineupViewModel @Inject constructor(
 
             homeTeamId = teamRepository.resolveTeamIdByName(homeKey)
             awayTeamId = teamRepository.resolveTeamIdByName(awayKey)
-            matchTournamentId = adminFixture?.tournamentId ?: "0"
-
-            val tournament = adminFixture?.tournamentId
-                ?.takeIf { it.isNotBlank() && it != "0" }
-                ?.let { tournamentRepository.getTournamentById(it) }
-            _squadSize.value = tournament?.squadSize
-                ?: scheduledFixture?.wickets?.plus(1)
-                ?: 11
 
             // One-shot loads - append-only from here on (see class KDoc).
             _homeSquad.value = playerRepository.getPlayersByTeamOnce(homeTeamId)

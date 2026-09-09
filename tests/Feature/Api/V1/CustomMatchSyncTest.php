@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\CricketMatch;
+use App\Models\PlayerProfile;
 use App\Models\Fixture;
 use App\Models\Team;
 use App\Models\User;
@@ -185,5 +186,41 @@ class CustomMatchSyncTest extends TestCase
         ])->assertOk();
 
         $this->assertDatabaseMissing('fixtures', ['id' => $fixtureId]);
+    }
+
+    public function test_guest_player_can_be_created_without_a_user_account(): void
+    {
+        [, $token] = $this->authenticatedUser();
+
+        $this->postJson('/api/v1/custom/players', [
+            'name' => 'Lineup Guest Batter',
+            'role' => 'Batter',
+        ], ['Authorization' => 'Bearer '.$token])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Lineup Guest Batter');
+
+        $profile = PlayerProfile::where('full_name', 'Lineup Guest Batter')->firstOrFail();
+        $this->assertNull($profile->user_id);
+        $this->assertTrue((bool) $profile->is_guest);
+        $this->assertNotNull($profile->unique_code);
+    }
+
+    public function test_super_admin_players_page_shows_guest_players(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super_admin');
+
+        [, $token] = $this->authenticatedUser();
+
+        $this->postJson('/api/v1/custom/players', [
+            'name' => 'Guest Allrounder',
+            'role' => 'All-Rounder',
+        ], ['Authorization' => 'Bearer '.$token])->assertCreated();
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.players.index'))
+            ->assertOk()
+            ->assertSee('Guest Allrounder')
+            ->assertSee('Guest');
     }
 }

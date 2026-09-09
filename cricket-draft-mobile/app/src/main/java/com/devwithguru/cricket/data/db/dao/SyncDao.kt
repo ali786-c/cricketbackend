@@ -61,4 +61,15 @@ interface PendingChangeDao {
 
     @Query("DELETE FROM pending_changes WHERE retryCount >= :maxRetries AND status = 'failed'")
     suspend fun deleteFailedChanges(maxRetries: Int = 5)
+
+    /**
+     * Requeue rows that would never be retried otherwise. The push loop only
+     * SELECTs status='pending', but it first marks rows 'syncing' (then
+     * 'failed' on error). A crash mid-push leaves rows stuck in 'syncing'
+     * forever, and a failed row stays dead until the retryCount purge — both
+     * silently drop the change (e.g. a lineup player that never reaches the
+     * backend). Call at the start of every push cycle.
+     */
+    @Query("UPDATE pending_changes SET status = 'pending' WHERE status IN ('syncing', 'failed')")
+    suspend fun requeueStuckChanges()
 }

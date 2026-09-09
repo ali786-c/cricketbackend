@@ -24,6 +24,7 @@ class PlayerProfile extends Model
         'photo_path',
         'bio',
         'is_active',
+        'is_guest',
     ];
 
     protected function casts(): array

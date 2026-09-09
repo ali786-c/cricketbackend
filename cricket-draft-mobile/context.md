@@ -32,6 +32,14 @@ This file tracks all architectural decisions, implemented screens, and changes m
     4.  **`SyncManager` stale-queue guard** — `create` changes for entities already synced by a direct-push path (e.g. `pushPendingFixtureToServer`) are now marked complete instead of re-executing, preventing duplicate fixtures/teams on the backend. `SyncManager` now also injects `AdminTeamDao`/`AdminPlayerDao` for the check.
 *   **Verification steps (device):** Create Match → pick/create both teams → Save → Toss → Lineup → Add Player → New Player → the player must appear instantly in the squad list AND stay visible; repeat on the away tab; airplane-mode test must also keep the player in the list (queued sync) and push when back online.
 
+## 📅 September 9, 2026: Lineup Player → Backend Delivery (why SuperAdmin showed nothing)
+*   **Symptom:** Player appeared in the squad list after the v2 fix, but never showed up in SuperAdmin → Players — "foran backend ma sync ho jaye" was not happening.
+*   **Root cause 1 (backend, fatal):** `app/Http/Controllers/Api/V1/CustomPlayerController.php` had a UTF-8 **BOM** before `<?php` → PHP fatal on class load → every `POST /api/v1/custom/players` returned 500. No guest `PlayerProfile` was ever created. BOM stripped; `php -l` clean now.
+*   **Root cause 2 (mobile, silent):** The push loop SELECTs only `status='pending'`, marks rows `'syncing'` before the attempt and `'failed'` on error — so ONE failure stranded the change forever, a crash mid-push stuck rows in `'syncing'`, and after 5 failed retries `deleteFailedChanges` DELETED them. New `SyncDao.requeueStuckChanges()` re-arms `'syncing'`/`'failed'` rows at the start of every `pushPendingChanges()` cycle, so the connectivity-restored push in `CricketApp` now genuinely retries the lineup player.
+*   **Also fixed:** `is_guest` added to `PlayerProfile::$fillable` (it was being mass-assignment-dropped); SuperAdmin Players blade now shows `playing_role` (previously referenced nonexistent `primary_role`), a **Guest** badge, and the player `unique_code` under the name.
+*   **Required on the server:** `php artisan migrate --force` (PHP 8.2+) — makes `player_profiles.user_id` nullable and creates `is_guest` (migration `2026_09_07_171000_make_user_id_nullable_in_player_profiles.php`). Without it the guest insert still violates the NOT NULL constraint.
+*   **Tests added:** `test_guest_player_can_be_created_without_a_user_account`, `test_super_admin_players_page_shows_guest_players` in `tests/Feature/Api/V1/CustomMatchSyncTest.php`.
+
 ## 📅 September 9, 2026: Unified Real IDs + Copy-to-Clipboard (Backend ↔ App)
 *   **Goal:** IDs shown in the app must be the SAME stable identifiers the backend uses — unique, shared, and copyable with one tap (user request).
 *   **Backend identifier scheme (real codes):**

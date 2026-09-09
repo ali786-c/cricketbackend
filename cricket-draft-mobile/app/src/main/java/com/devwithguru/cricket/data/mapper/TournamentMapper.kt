@@ -20,7 +20,8 @@ fun TournamentData.toEntity() = TournamentEntity(
     endDate = ends_on ?: "",
     ballType = ball_type ?: "leather",
     oversPerInnings = default_overs_per_innings ?: 20,
-    wicketsPerTeam = 10, // Not explicitly provided by API in TournamentData, default to 10
+    // Calculate wickets per team from squad size, defaulting to 10 if squad size is null (11 - 1)
+    wicketsPerTeam = (squad_size ?: 11) - 1,
     competitionStructure = competition_structure ?: "League",
     visibility = if (is_public == true) "Public" else "Private",
     tournamentCode = tournament_code ?: "",

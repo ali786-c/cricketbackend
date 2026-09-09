@@ -118,6 +118,9 @@ class SyncManager @Inject constructor(
         var failCount = 0
 
         try {
+            // Recover rows stuck in 'syncing' (crashed push) and re-arm 'failed'
+            // rows so they actually retry — the SELECT below only sees 'pending'.
+            pendingChangeDao.requeueStuckChanges()
             val pendingChanges = pendingChangeDao.getPendingChanges()
             for (change in pendingChanges) {
                 try {
