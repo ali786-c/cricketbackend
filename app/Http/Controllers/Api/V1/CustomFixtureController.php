@@ -32,6 +32,16 @@ class CustomFixtureController extends Controller
         return response()->json(['data' => $this->fixtures->transition($fixture, $data['status'], (int) $request->user()->id)]);
     }
 
+    public function destroy(Request $request, Fixture $fixture): JsonResponse
+    {
+        abort_if($fixture->match()->exists(), 422, 'This fixture already has an operational match.');
+
+        $fixture->update(['updated_by' => (int) $request->user()->id]);
+        $fixture->delete();
+
+        return response()->json(['data' => null, 'message' => 'Custom fixture deleted successfully.']);
+    }
+
     public function createMatch(Request $request, Fixture $fixture): JsonResponse
     {
         $match = $this->fixtures->createMatch($fixture, (int) $request->user()->id);

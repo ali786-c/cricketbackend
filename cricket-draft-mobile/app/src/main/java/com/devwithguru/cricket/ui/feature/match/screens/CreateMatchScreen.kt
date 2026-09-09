@@ -91,6 +91,20 @@ fun CreateMatchScreen(
     val errInvalidWickets = stringResource(R.string.err_invalid_wickets)
     val msgFixtureSaved = stringResource(R.string.msg_fixture_saved)
 
+    // Seed from locally known teams (Room-backed, includes synced server teams);
+    // falls back to a starter set on first launch.
+    val knownTeams = remember { mutableStateListOf<String>() }
+    var teamsLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!teamsLoaded) {
+            teamsLoaded = true
+            val names = viewModel.loadKnownTeamNames()
+            knownTeams.clear()
+            knownTeams.addAll(if (names.isNotEmpty()) names else listOf("BHH", "NHH"))
+        }
+    }
+    val existingTeams = knownTeams
+
     val monthNames = listOf(
         stringResource(R.string.month_jan),
         stringResource(R.string.month_feb),
@@ -105,10 +119,6 @@ fun CreateMatchScreen(
         stringResource(R.string.month_nov),
         stringResource(R.string.month_dec)
     )
-
-    val existingTeams = remember {
-        mutableStateListOf("BHH", "NHH", "Ali Panthers", "Rawalpindi Kings", "Islamabad Blasters")
-    }
 
     // Android Native DatePickerDialog configuration
     val calendar = Calendar.getInstance()
@@ -583,23 +593,22 @@ fun CreateMatchScreen(
                                 else -> {
                                     val parsedOvers = selectedOvers.toIntOrNull() ?: 6
                                     val matchId = "m_${System.currentTimeMillis()}"
-                                    // Add it as live directly via ViewModel
-                                    viewModel.saveFixture(
-                                        ScheduledFixture(
-                                            id = matchId,
-                                            homeTeam = homeTeam,
-                                            awayTeam = awayTeam,
-                                            overs = parsedOvers,
-                                            ballType = selectedBallType,
-                                            matchType = selectedMatchType,
-                                            wickets = selectedWickets.toIntOrNull() ?: 10,
-                                            venue = venue,
-                                            date = matchDate,
-                                            time = matchTime,
-                                            status = "Live"
-                                        )
+                                    val fixture = ScheduledFixture(
+                                        id = matchId,
+                                        homeTeam = homeTeam,
+                                        awayTeam = awayTeam,
+                                        overs = parsedOvers,
+                                        ballType = selectedBallType,
+                                        matchType = selectedMatchType,
+                                        wickets = selectedWickets.toIntOrNull() ?: 10,
+                                        venue = venue,
+                                        date = matchDate,
+                                        time = matchTime,
+                                        status = "Live"
                                     )
-                                    scope.launch {
+                                    Toast.makeText(context, msgFixtureSaved, Toast.LENGTH_LONG).show()
+                                    // Save + queue sync + immediate push; navigates when ready
+                                    viewModel.startFixture(fixture) {
                                         onCreateMatchSuccess(
                                             matchId,
                                             homeTeam,
@@ -834,15 +843,21 @@ fun CreateMatchScreen(
                             // Action button matching app primary color
                             Button(
                                 onClick = {
-                                    if (newTeamName.isNotBlank()) {
-                                        existingTeams.add(0, newTeamName)
-                                        if (activeSelectingTeamSide == "A") {
-                                            homeTeam = newTeamName
-                                        } else {
-                                            awayTeam = newTeamName
+                                    if (newTeamName.isNotBlank() && !viewModel.isSaving.value) {
+                                        val name = newTeamName.trim()
+                                        val loc = newTeamLocation.trim().takeIf { it.isNotBlank() }
+                                        // REAL creation: saves to Room, queues sync, pushes
+                                        // to /api/v1/custom/teams → appears in SuperAdmin Teams
+                                        viewModel.createTeam(name, loc) { _, createdName ->
+                                            existingTeams.add(0, createdName)
+                                            if (activeSelectingTeamSide == "A") {
+                                                homeTeam = createdName
+                                            } else {
+                                                awayTeam = createdName
+                                            }
+                                            isCreateTeamDialogOpen = false
+                                            activeSelectingTeamSide = null
                                         }
-                                        isCreateTeamDialogOpen = false
-                                        activeSelectingTeamSide = null
                                     }
                                 },
                                 shape = RoundedCornerShape(8.dp),

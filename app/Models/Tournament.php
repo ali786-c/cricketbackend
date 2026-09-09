@@ -59,6 +59,30 @@ class Tournament extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Tournament $tournament) {
+            if (empty($tournament->tournament_code)) {
+                $tournament->tournament_code = self::generateUniqueCode();
+            }
+        });
+    }
+
+    /**
+     * Stable public join/reference code (TRN-XXXXX) — same convention as
+     * Team (TEAM-XXXXX) and PlayerProfile (6-digit). Shown in the mobile app
+     * with a copy action so users can share the exact same identifier that
+     * the backend uses.
+     */
+    public static function generateUniqueCode(): string
+    {
+        do {
+            $code = 'TRN-' . strtoupper(\Illuminate\Support\Str::random(5));
+        } while (static::where('tournament_code', $code)->exists());
+
+        return $code;
+    }
+
     public function getRouteKeyName(): string
     {
         return 'slug';

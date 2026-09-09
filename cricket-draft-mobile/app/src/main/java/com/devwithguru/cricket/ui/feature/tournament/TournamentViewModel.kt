@@ -285,12 +285,9 @@ class TournamentViewModel @Inject constructor(
                 // Save to Room so it appears in "My Tournaments" immediately
                 val domain = data.toDomain()
                 tournamentRepository.saveTournament(domain)
-                // Queue for sync tracking ensures dedup on next pull
-                syncManager.queueChange("tournament", data.id.toString(), "create", mapOf(
-                    "serverId" to data.id,
-                    "name" to name,
-                    "slug" to slug
-                ))
+                // NOTE: no sync queue entry — the direct API call above already
+                // created the tournament on the server; queueing a "create" here
+                // would push a duplicate to the backend.
             }
             result.onFailure { e ->
                 _createError.value = e.message ?: "Failed to create tournament"

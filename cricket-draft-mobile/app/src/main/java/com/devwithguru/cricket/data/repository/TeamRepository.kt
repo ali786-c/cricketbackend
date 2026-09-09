@@ -55,6 +55,33 @@ class TeamRepository @Inject constructor(
         return teamIdStr
     }
 
+    /**
+     * Resolve a team's local ID when only the NAME is known (custom-match
+     * fixtures store team names without IDs). Falls back to the name itself
+     * when no local team matches — callers use [resolveTeamName] for display.
+     */
+    suspend fun resolveTeamIdByName(teamName: String): String {
+        val trimmed = teamName.trim()
+        if (trimmed.isBlank()) return ""
+        return adminTeamDao.getAllAdminTeams()
+            .firstOrNull { it.name.trim().equals(trimmed, ignoreCase = true) }
+            ?.id
+            ?: trimmed
+    }
+
+    /**
+     * The display name for a resolved team ID. Handles all three storage
+     * forms: admin team entity, standard team row, and a raw team name that
+     * was never resolved to an ID.
+     */
+    suspend fun resolveTeamName(teamIdOrName: String): String {
+        if (teamIdOrName.isBlank()) return ""
+        val admin = adminTeamDao.findById(teamIdOrName)
+        if (admin != null) return admin.name
+        teamDao.findById(teamIdOrName)?.let { return it.name }
+        return teamIdOrName
+    }
+
     suspend fun saveTeam(team: Team) {
         teamDao.insertTeam(team.toEntity())
         val adminTeam = adminTeamDao.findById(team.id)

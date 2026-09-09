@@ -12,10 +12,19 @@ import com.devwithguru.cricket.domain.model.RegisteredPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Squads for the Toss -> Lineup flow.
+ *
+ * Squad lists are loaded ONCE per match (one-shot Room reads) and afterwards
+ * only ever APPENDED to. Earlier versions collected live Room Flows: every
+ * insert into the players table - including the very insert that REGISTERS a
+ * newly added player - re-fired the collector, and the re-queried list raced
+ * (and lost against) the append, so freshly added players vanished from the
+ * UI immediately. One-shot loads make the ViewModel the single writer.
+ */
 @HiltViewModel
 class LineupViewModel @Inject constructor(
     private val playerRepository: PlayerRepository,
@@ -48,68 +57,56 @@ class LineupViewModel @Inject constructor(
     var matchTournamentId: String = "0"
         private set
 
+    private var squadsLoaded = false
+
     fun loadSquadsForMatch(matchId: String) {
+        if (squadsLoaded) return // navigation relaunches fire LaunchedEffect again - don't reset/relaunch
+        squadsLoaded = true
         _isLoading.value = true
         _homeSquad.value = emptyList()
         _awaySquad.value = emptyList()
         _squadSize.value = 11
+
         viewModelScope.launch {
             val adminFixture = fixtureRepository.getAdminFixtureById(matchId)
-            if (adminFixture != null) {
-                val originalHomeId = teamRepository.resolveOriginalTeamId(adminFixture.homeTeamId)
-                val originalAwayId = teamRepository.resolveOriginalTeamId(adminFixture.awayTeamId)
-                homeTeamId = originalHomeId
-                awayTeamId = originalAwayId
-                matchTournamentId = adminFixture.tournamentId
-                
-                val tournament = tournamentRepository.getTournamentById(adminFixture.tournamentId)
-                if (tournament != null) {
-                    _squadSize.value = tournament.squadSize
-                }
-                
-                playerRepository.getPlayersByTeam(originalHomeId).collect { list ->
-                    _homeSquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
-                    _isLoading.value = false
-                }
+            val scheduledFixture = if (adminFixture == null) {
+                fixtureRepository.getScheduledFixtureById(matchId)
+            } else null
+
+            // Resolve BOTH team IDs before loading squads. Custom-match fixtures
+            // store team NAMES with blank/placeholder IDs, so prefer the stored
+            // name and resolve it through the admin team registry (the Create
+            // Match flow registers teams by name before any match exists).
+            // Loading squads with an empty/unresolved key was the reason newly
+            // registered players never showed up in the lineup.
+            val homeKey = if (adminFixture != null) {
+                adminFixture.homeTeamName.ifBlank { adminFixture.homeTeamId }
             } else {
-                val scheduledFixture = fixtureRepository.getScheduledFixtureById(matchId)
-                if (scheduledFixture != null) {
-                    homeTeamId = scheduledFixture.homeTeam
-                    awayTeamId = scheduledFixture.awayTeam
-                    matchTournamentId = "0"
-                    _squadSize.value = scheduledFixture.wickets + 1
-                    
-                    playerRepository.getPlayersByTeam(scheduledFixture.homeTeam).collect { list ->
-                        _homeSquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
-                        _isLoading.value = false
-                    }
-                } else {
-                    _isLoading.value = false
-                }
+                scheduledFixture?.homeTeam ?: ""
             }
-        }
-        viewModelScope.launch {
-            val adminFixture = fixtureRepository.getAdminFixtureById(matchId)
-            if (adminFixture != null) {
-                val originalHomeId = teamRepository.resolveOriginalTeamId(adminFixture.homeTeamId)
-                val originalAwayId = teamRepository.resolveOriginalTeamId(adminFixture.awayTeamId)
-                homeTeamId = originalHomeId
-                awayTeamId = originalAwayId
-                playerRepository.getPlayersByTeam(originalAwayId).collect { list ->
-                    _awaySquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
-                    _isLoading.value = false
-                }
+            val awayKey = if (adminFixture != null) {
+                adminFixture.awayTeamName.ifBlank { adminFixture.awayTeamId }
             } else {
-                val scheduledFixture = fixtureRepository.getScheduledFixtureById(matchId)
-                if (scheduledFixture != null) {
-                    playerRepository.getPlayersByTeam(scheduledFixture.awayTeam).collect { list ->
-                        _awaySquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
-                        _isLoading.value = false
-                    }
-                } else {
-                    _isLoading.value = false
-                }
+                scheduledFixture?.awayTeam ?: ""
             }
+
+            homeTeamId = teamRepository.resolveTeamIdByName(homeKey)
+            awayTeamId = teamRepository.resolveTeamIdByName(awayKey)
+            matchTournamentId = adminFixture?.tournamentId ?: "0"
+
+            val tournament = adminFixture?.tournamentId
+                ?.takeIf { it.isNotBlank() && it != "0" }
+                ?.let { tournamentRepository.getTournamentById(it) }
+            _squadSize.value = tournament?.squadSize
+                ?: scheduledFixture?.wickets?.plus(1)
+                ?: 11
+
+            // One-shot loads - append-only from here on (see class KDoc).
+            _homeSquad.value = playerRepository.getPlayersByTeamOnce(homeTeamId)
+                .map { PlayerSelectable(it.id, it.name, it.role) }
+            _awaySquad.value = playerRepository.getPlayersByTeamOnce(awayTeamId)
+                .map { PlayerSelectable(it.id, it.name, it.role) }
+            _isLoading.value = false
         }
     }
 
@@ -142,22 +139,26 @@ class LineupViewModel @Inject constructor(
             val targetTeamId = if (forHomeTeam) homeTeamId else awayTeamId
             val registered = playerRepository.registerPlayer(name, role, teamId = targetTeamId.takeIf { it.isNotBlank() })
             val selectable = PlayerSelectable(registered.id, registered.name, registered.role)
+
+            // Append FIRST - after the one-shot load this ViewModel is the only
+            // writer to the squad lists, so nothing can wipe this player anymore.
             if (forHomeTeam) {
                 _homeSquad.value = _homeSquad.value + selectable
             } else {
                 _awaySquad.value = _awaySquad.value + selectable
             }
-            
+
             // Immediately sync or queue offline
-            val payload = mapOf(
-                "action" to "create",
-                "name" to name,
-                "role" to role,
-                "tournamentId" to matchTournamentId
-            )
+            val payload = buildMap<String, String> {
+                put("action", "create")
+                put("name", name)
+                put("role", role)
+                put("tournamentId", matchTournamentId)
+                if (targetTeamId.isNotBlank()) put("teamId", targetTeamId)
+            }
             syncManager.queueChange("player", registered.id, "create", payload)
             syncManager.pushPendingChanges()
-            
+
             onComplete(registered.id)
         }
     }

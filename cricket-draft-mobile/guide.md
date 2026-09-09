@@ -287,3 +287,50 @@ Use these guidelines to verify post-match delivery corrections and automated sco
     4.  Verify that the striker's batting stats (runs and strike rate) and the innings score totals are automatically updated.
 *   **Expected Result**: Recalculated scorecard totals match updated delivery metrics.
 
+---
+
+## 🛠️ Phase 14: Instant Team & Match Sync (Create Match Flow) Verification
+
+Use these steps to verify that standalone (custom) matches and their teams reach the backend instantly and appear in the SuperAdmin control plane — even when created offline.
+
+### 1. 🏏 Create Team from "Create Match" → SuperAdmin Teams
+*   **Objective**: A team created inside the Create Match flow must appear in SuperAdmin → Teams immediately.
+*   **Test Steps**:
+    1.  Open the app → Homepage → **Create Match**.
+    2.  Tap Team A → **Create Team** → enter name (+ optional location) → tap **CREATE TEAM**.
+    3.  With internet ON: within a few seconds, open the SuperAdmin web panel → **Teams** tab. The new team must be listed (refresh if needed).
+    4.  With internet OFF (airplane mode): repeat with another team name. The app must work normally (team selected locally). Then turn internet back on and wait ~15 seconds (or reopen the app) and check the SuperAdmin Teams tab again.
+*   **Expected Result**: Team exists in the backend in both cases (instant when online, auto-synced when reconnected). The team also appears in the in-app team list on next launch (pulled from Room, not a hardcoded list).
+
+### 2. 📅 Save Fixture → SuperAdmin Fixtures
+*   **Objective**: A standalone saved match must appear in SuperAdmin → **Fixtures** (new tab) even before it starts.
+*   **Test Steps**:
+    1.  Create Match → pick both teams, set venue/date/time → tap **SAVE FIXTURE**.
+    2.  Open SuperAdmin → **Fixtures** tab.
+    3.  The fixture must show with the **Custom Match** badge, both team names, and the scheduled date.
+*   **Expected Result**: Fixture row visible with status `Scheduled`. The two teams (if newly named) were auto-created globally on the backend.
+
+### 3. ▶️ Start Match → SuperAdmin Matches
+*   **Objective**: Starting a match creates the operational match record server-side.
+*   **Test Steps**:
+    1.  In the Create Match flow tap **START MATCH** (or start a saved fixture from the tournament matches tab).
+    2.  Complete toss/lineup and begin scoring.
+    3.  Open SuperAdmin → **Matches** tab.
+*   **Expected Result**: The match appears (status `Scheduled`/`Live`) linked to the custom fixture, with both team names shown.
+
+### 4. 🔁 Offline Queue & Idempotency
+*   **Objective**: Offline-created data must sync once (no duplicates) when the connection returns.
+*   **Test Steps**:
+    1.  Airplane mode ON → create a match with two new teams.
+    2.  Airplane mode OFF → let the app auto-sync (or tap sync).
+    3.  Check the SuperAdmin Teams tab: each team must appear exactly once. Check Fixtures: the fixture must appear exactly once.
+    4.  Re-open the app while online — confirm no duplicate fixtures/teams are pulled (dedup by server ID).
+*   **Expected Result**: Exactly one copy of each team and fixture on the backend; local and server IDs stay mapped (no re-creation on next sync).
+
+### 5. 🧯 Retry Hygiene (no infinite background retry)
+*   **Objective**: A permanently invalid queued change must not loop the background worker forever.
+*   **Test Steps**:
+    1.  (Dev) Inspect WorkManager logs while a failing change is in the queue.
+    2.  Confirm the worker gives up after 3 consecutive no-progress attempts (`Result.failure`) instead of endless exponential retries.
+*   **Expected Result**: `SyncWorker` logs `Sync gave up after N attempts` and stops; foreground/manual sync still retries the queue.
+

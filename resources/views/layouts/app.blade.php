@@ -27,6 +27,7 @@
                             <li><a class="dropdown-item" href="{{ route('super-admin.users.index') }}"><i class="fa-solid fa-users-gear me-2 text-success"></i>Users and roles</a></li>
                             <li><a class="dropdown-item" href="{{ route('super-admin.tournaments.index') }}"><i class="fa-solid fa-trophy me-2 text-success"></i>Tournament fleet</a></li>
                             <li><a class="dropdown-item" href="{{ route('super-admin.matches.index') }}"><i class="fa-solid fa-baseball-bat-ball me-2 text-success"></i>Matches</a></li>
+                            <li><a class="dropdown-item" href="{{ route('super-admin.fixtures.index') }}"><i class="fa-regular fa-calendar-days me-2 text-success"></i>Fixtures</a></li>
                             <li><a class="dropdown-item" href="{{ route('super-admin.teams.index') }}"><i class="fa-solid fa-people-group me-2 text-success"></i>Teams</a></li>
                             <li><a class="dropdown-item" href="{{ route('super-admin.players.index') }}"><i class="fa-solid fa-person-running me-2 text-success"></i>Players</a></li>
                             <li><a class="dropdown-item" href="{{ route('super-admin.api-clients.index') }}"><i class="fa-solid fa-plug me-2 text-success"></i>API clients</a></li>
@@ -40,6 +41,7 @@
                         <a href="{{ route('super-admin.users.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.users.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-users-gear me-1"></i>Users</a>
                         <a href="{{ route('super-admin.tournaments.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.tournaments.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-trophy me-1"></i>Fleet</a>
                         <a href="{{ route('super-admin.matches.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.matches.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-baseball-bat-ball me-1"></i>Matches</a>
+                        <a href="{{ route('super-admin.fixtures.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.fixtures.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-regular fa-calendar-days me-1"></i>Fixtures</a>
                         <a href="{{ route('super-admin.teams.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.teams.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-people-group me-1"></i>Teams</a>
                         <a href="{{ route('super-admin.players.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.players.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-person-running me-1"></i>Players</a>
                         <a href="{{ route('super-admin.api-clients.index') }}" class="btn btn-sm {{ request()->routeIs('super-admin.api-clients.*') || request()->routeIs('super-admin.api-sessions.*') ? 'btn-success' : 'btn-light' }}"><i class="fa-solid fa-plug me-1"></i>API</a>

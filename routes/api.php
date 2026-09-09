@@ -59,6 +59,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::put('custom/fixtures/{fixture}', [CustomFixtureController::class, 'update'])->name('api.v1.custom.fixtures.update');
         Route::post('custom/fixtures/{fixture}/status', [CustomFixtureController::class, 'status'])->name('api.v1.custom.fixtures.status');
         Route::post('custom/fixtures/{fixture}/create-match', [CustomFixtureController::class, 'createMatch'])->name('api.v1.custom.fixtures.create-match');
+        Route::delete('custom/fixtures/{fixture}', [CustomFixtureController::class, 'destroy'])->name('api.v1.custom.fixtures.destroy');
         Route::get('auth/me', [AuthController::class, 'me'])->name('api.v1.auth.me');
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.v1.auth.logout-all');

@@ -22,6 +22,9 @@ data class TeamEntity(
     val wicketkeeperName: String? = null,
     val creatorId: Int? = null,
 
+    /** Backend stable code (TEAM-XXXXX) — the real shareable identifier. */
+    val teamCode: String? = null,
+
     // ── Sync ──
     val updatedAt: Long = System.currentTimeMillis()
 )

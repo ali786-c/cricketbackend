@@ -49,6 +49,8 @@ class SyncManager @Inject constructor(
     private val tournamentDao: TournamentDao,
     private val teamDao: TeamDao,
     private val adminFixtureDao: AdminFixtureDao,
+    private val adminTeamDao: com.devwithguru.cricket.data.db.dao.AdminTeamDao,
+    private val adminPlayerDao: com.devwithguru.cricket.data.db.dao.AdminPlayerDao,
     private val apiService: ApiService,
     private val authRepository: AuthRepository,
     private val gson: Gson,
@@ -158,19 +160,77 @@ class SyncManager @Inject constructor(
         val payload = gson.fromJson(change.payload, Map::class.java) as? Map<*, *> ?: return true
         val authHeader = "Bearer $token"
 
+        // Stale-queue guard: direct-push paths (e.g. pushPendingFixtureToServer)
+        // may have already synced this entity while its queued "create" change
+        // was still waiting. Re-running that create would duplicate the entity
+        // on the backend, so mark it complete instead.
+        if (change.action == "create") {
+            val alreadySynced = when (change.entityType) {
+                "admin_fixture", "fixture" -> adminFixtureDao.findById(change.entityId)?.serverId != null
+                "team", "admin_team" -> adminTeamDao.findById(change.entityId)?.serverId != null
+                "admin_player" -> adminPlayerDao.findById(change.entityId)?.serverId != null
+                else -> false
+            }
+            if (alreadySynced) return true
+        }
+
         return try {
             when (change.entityType) {
-                "admin_team" -> pushTeamChange(change, payload, authHeader)
-                "admin_player" -> pushPlayerChange(payload, authHeader)
+                // "admin_team" from AdminLocalRepository, "team" from TournamentSetupViewModel.createTeam
+                "team", "admin_team" -> pushTeamChange(change, payload, authHeader)
+                // "player" comes from LineupViewModel.registerNewPlayer
+                "player", "admin_player" -> pushPlayerChange(payload, authHeader)
                 "admin_fixture" -> pushFixtureChange(change, payload, authHeader)
                 "fixture" -> pushFixtureChange(change, payload, authHeader)  // Also handle from MainViewModel.startMatch()
                 "admin_draft_setup" -> true
+                // "tournament" create is queued after a DIRECT API create already succeeded
+                // (TournamentViewModel) — nothing to push, mark complete without action.
+                "tournament" -> true
+                // Stages are a mobile-only offline concept (PRD) until the backend ships
+                // stage endpoints — mark complete to keep the queue clean.
+                "stage" -> true
                 "tournament_status" -> pushTournamentStatusChange(payload, authHeader)
                 "captain" -> pushCaptainChange(payload, authHeader)
                 "delivery" -> true // handled by DeliverySyncRepository
                 else -> true
             }
         } catch (e: Exception) { false }
+    }
+
+    /**
+     * Build an ISO-8601 scheduled_at string from whatever combination the
+     * queue payload carries. Accepts "19 Aug 2026" human dates and
+     * "2026-08-19" ISO dates; falls back to today when unparseable so the
+     * backend date validation never rejects the whole sync batch.
+     */
+    private fun normalizeScheduledAt(scheduledAt: String?, date: String?, time: String?): String {
+        val rawTime = time?.takeIf { it.isNotBlank() } ?: "00:00"
+        val hhmm = if (rawTime.length >= 5) rawTime.take(5) else rawTime
+        if (!scheduledAt.isNullOrBlank()) {
+            return "${scheduledAt.take(10)}T$hhmm:00.000000Z"
+        }
+        val rawDate = date?.trim().orEmpty()
+        if (Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(rawDate)) {
+            return "${rawDate}T$hhmm:00.000000Z"
+        }
+        // Parse "19 Aug 2026" style dates
+        val monthMap = mapOf(
+            "jan" to 1, "feb" to 2, "mar" to 3, "apr" to 4,
+            "may" to 5, "jun" to 6, "jul" to 7, "aug" to 8,
+            "sep" to 9, "oct" to 10, "nov" to 11, "dec" to 12
+        )
+        val parts = rawDate.lowercase()
+            .replace("-", " ").replace(",", " ")
+            .split(Regex("\\s+")).filter { it.isNotBlank() }
+        val day = parts.firstOrNull { it.toIntOrNull() != null }?.toIntOrNull()
+        val month = parts.firstOrNull { monthMap.containsKey(it.take(3)) }?.let { monthMap[it.take(3)] }
+        val year = parts.lastOrNull { it.length == 4 && it.toIntOrNull() != null }?.toIntOrNull()
+        val iso = if (day != null && month != null && year != null) {
+            String.format("%04d-%02d-%02d", year, month, day)
+        } else {
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+        }
+        return "${iso}T$hhmm:00.000000Z"
     }
 
     /**
@@ -208,17 +268,21 @@ class SyncManager @Inject constructor(
     }
 
     private suspend fun pushPlayerChange(payload: Map<*, *>, authHeader: String): Boolean {
-        val tournamentId = payload["tournamentId"] as? String ?: return false
+        val tournamentId = payload["tournamentId"] as? String ?: "0"
         return when (payload["action"] as? String) {
             "create" -> {
                 val name = payload["name"] as? String ?: return false
                 val role = payload["role"] as? String
-                val request = mapOf("name" to name, "role" to (role ?: ""))
-                if (tournamentId == "0" || tournamentId.isEmpty()) {
-                    apiService.createCustomPlayer(authHeader, request).isSuccessful
-                } else {
-                    apiService.createCustomPlayer(authHeader, request).isSuccessful // Admin player manual store is currently CustomPlayerController for global players
+                val request = buildMap<String, String> {
+                    put("name", name)
+                    put("role", role ?: "")
+                    val teamId = payload["teamId"] as? String
+                    if (!teamId.isNullOrBlank()) put("team_id", teamId)
                 }
+                // Both paths use the global guest-player endpoint; the payload's
+                // teamId keeps the device-side team link so the player shows up
+                // in the right roster after the next pull.
+                apiService.createCustomPlayer(authHeader, request).isSuccessful
             }
             "approve" -> {
                 val playerId = payload["playerId"] as? String ?: return false
@@ -247,22 +311,21 @@ class SyncManager @Inject constructor(
                     away_team_id = (payload["awayTeamId"] as? String)?.toIntOrNull() ?: 0,
                     home_team_name = payload["homeTeamName"] as? String,
                     away_team_name = payload["awayTeamName"] as? String,
-                    scheduled_at = (payload["scheduledAt"] as? String)
-                        ?: run {
-                            val date = payload["scheduledDate"] as? String ?: ""
-                            val time = payload["scheduledTime"] as? String ?: "00:00"
-                            if (date.isNotBlank()) "${date}T${time}:00.000000Z" else ""
-                        },
+                    scheduled_at = normalizeScheduledAt(
+                        payload["scheduledAt"] as? String,
+                        payload["scheduledDate"] as? String,
+                        payload["scheduledTime"] as? String
+                    ),
                     venue = payload["venue"] as? String,
                     city = payload["city"] as? String
                 )
-                
-                val response = if (tournamentId.isEmpty() || tournamentId == "custom") {
+
+                val response = if (tournamentId.isEmpty() || tournamentId == "custom" || tournamentId == "0") {
                     apiService.createCustomFixture(authHeader, body)
                 } else {
                     apiService.createFixture(authHeader, tournamentId, body)
                 }
-                
+
                 if (response.isSuccessful) {
                     val serverId = response.body()?.data?.id
                     if (serverId != null) {
@@ -273,13 +336,28 @@ class SyncManager @Inject constructor(
                 } else false
             }
             "update" -> {
-                // Handle status updates (like live/completed) via API
+                // Handle status updates (like live/completed) via API.
+                // Uses the custom status route for standalone fixtures and the
+                // server ID (never the local string ID) for the path segment.
                 val status = payload["status"] as? String
-                val tournamentId = payload["tournamentId"] as? String
-                if (status != null && tournamentId != null) {
-                    try {
-                        apiService.updateFixtureStatus(authHeader, tournamentId, change.entityId, UpdateFixtureStatusRequest(status)).isSuccessful
-                    } catch (_: Exception) { false }
+                if (status != null) {
+                    // Backend fixture lifecycle uses "in_progress"; mobile calls it "live"
+                    val serverStatus = if (status.equals("live", ignoreCase = true)) "in_progress" else status.lowercase()
+                    val serverFixtureId = change.entityId
+                        .let { id -> adminFixtureDao.findById(id)?.serverId }
+                        ?.toString()
+                    if (serverFixtureId != null) {
+                        val body = com.devwithguru.cricket.data.api.UpdateFixtureStatusRequest(serverStatus)
+                        val response = if (tournamentId.isEmpty() || tournamentId == "custom" || tournamentId == "0") {
+                            apiService.updateCustomFixtureStatus(authHeader, serverFixtureId, body)
+                        } else {
+                            apiService.updateFixtureStatus(authHeader, tournamentId, serverFixtureId, body)
+                        }
+                        response.isSuccessful
+                    } else {
+                        adminFixtureDao.updateSyncStatus(change.entityId, "synced")
+                        true
+                    }
                 } else {
                     adminFixtureDao.updateSyncStatus(change.entityId, "synced")
                     true
@@ -288,7 +366,12 @@ class SyncManager @Inject constructor(
             "delete" -> {
                 val serverFixtureId = (payload["serverId"] as? String)?.toIntOrNull()
                 if (serverFixtureId != null) {
-                    apiService.deleteFixture(authHeader, tournamentId, serverFixtureId.toString()).isSuccessful
+                    val response = if (tournamentId.isEmpty() || tournamentId == "custom" || tournamentId == "0") {
+                        apiService.deleteCustomFixture(authHeader, serverFixtureId.toString())
+                    } else {
+                        apiService.deleteFixture(authHeader, tournamentId, serverFixtureId.toString())
+                    }
+                    response.isSuccessful
                 } else true
             }
             else -> true
@@ -395,6 +478,7 @@ class SyncManager @Inject constructor(
                         val updated = existingByServerId.copy(
                             name = teamData.name ?: existingByServerId.name,
                             shortName = teamData.short_name ?: existingByServerId.shortName,
+                            teamCode = teamData.unique_code ?: existingByServerId.teamCode,
                             updatedAt = System.currentTimeMillis()
                         )
                         teamDao.insertTeam(updated)
@@ -406,6 +490,7 @@ class SyncManager @Inject constructor(
                             name = teamData.name ?: "",
                             shortName = teamData.short_name ?: "",
                             tournamentId = tournamentId,
+                            teamCode = teamData.unique_code,
                             updatedAt = System.currentTimeMillis()
                         )
                         teamDao.insertTeam(newEntity)

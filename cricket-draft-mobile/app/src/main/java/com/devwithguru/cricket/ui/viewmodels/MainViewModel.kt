@@ -118,6 +118,15 @@ class MainViewModel @Inject constructor(
             if (fixture != null) {
                 val adminFixture = fixtureRepository.getAdminFixtureById(fixture.id)
                 val tournamentId = adminFixture?.tournamentId ?: ""
+
+                // Step 4a: ensure the backend has the fixture itself (covers
+                // legacy/local-only fixtures created before sync was wired)
+                fixtureRepository.pushPendingFixtureToServer(fixture.id)
+
+                // Step 4b: create the operational match server-side so the game
+                // appears in the SuperAdmin Matches tab immediately
+                fixtureRepository.createOperationalMatchIfNeeded(fixture.id)
+
                 syncManager.queueChange(
                     "fixture", fixture.id, "update",
                     mapOf("tournamentId" to tournamentId, "status" to "live")

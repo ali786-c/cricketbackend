@@ -1,6 +1,7 @@
 package com.devwithguru.cricket.data.sync
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -15,6 +16,12 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Background worker that syncs data periodically.
+ *
+ * Retry policy: partial success counts as success (the next periodic run
+ * finishes the rest). We only retry while progress is being made and give up
+ * permanently after 3 fruitless attempts — this prevents the exponential
+ * backoff loop seen when permanently-invalid changes (e.g. 422 validation
+ * failures) sit in the queue.
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -26,22 +33,35 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            if (connectivityMonitor.isCurrentlyOnline()) {
-                val result = syncManager.fullSync()
-                if (result.success) {
-                    Result.success()
-                } else {
-                    Result.retry()
-                }
+            if (!connectivityMonitor.isCurrentlyOnline()) {
+                return Result.success() // Nothing to sync when offline
+            }
+
+            val result = syncManager.fullSync()
+            if (result.success) {
+                Result.success()
             } else {
-                Result.success() // Nothing to sync when offline
+                // "Pushed X, failed Y" — progress means at least one item got through
+                val hadProgress = syncManager.syncMessage.value
+                    ?.let { Regex("Pushed ([1-9]\\d*)").find(it)?.groupValues?.get(1)?.toIntOrNull() ?: 0 }
+                    ?.let { it > 0 } ?: false
+                if (hadProgress && runAttemptCount < MAX_CONSECUTIVE_FAILURES) {
+                    Result.retry()
+                } else {
+                    Log.w(TAG, "Sync gave up after $runAttemptCount attempts: ${result.message}")
+                    Result.failure()
+                }
             }
         } catch (e: Exception) {
-            Result.retry()
+            Log.w(TAG, "Sync attempt $runAttemptCount failed", e)
+            if (runAttemptCount < MAX_CONSECUTIVE_FAILURES) Result.retry() else Result.failure()
         }
     }
 
     companion object {
+        private const val TAG = "SyncWorker"
+        private const val MAX_CONSECUTIVE_FAILURES = 3
+
         private const val WORK_NAME = "cricket_sync_work"
 
         /**

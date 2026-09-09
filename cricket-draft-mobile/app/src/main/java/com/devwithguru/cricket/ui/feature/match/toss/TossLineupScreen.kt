@@ -665,7 +665,7 @@ private fun AddPlayerDialog(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "${fp.role} • ID: ${fp.id}",
+                                                text = "${fp.role} • ID: ${fp.uniqueCode ?: fp.id}",
                                                 color = MaterialTheme.colorScheme.primary,
                                                 fontSize = 11.sp
                                             )

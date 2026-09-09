@@ -4,6 +4,52 @@ This file tracks all architectural decisions, implemented screens, and changes m
 
 ---
 
+## 📅 September 9, 2026: Instant Team & Match Sync (Create Match Flow)
+*   **Create Team is now real:** The Create Match screen's "Create Team" dialog saves a genuine global team via `AdminLocalRepository.createTeam(tournamentId = "0")`, mirrors it into the `teams` table, queues an `admin_team` sync change, and immediately calls `syncManager.pushPendingChanges()` so it hits `POST /api/v1/custom/teams` and appears in the SuperAdmin Teams tab instantly (queued automatically when offline).
+*   **Room-backed team list:** The hardcoded demo team list (`BHH`, `NHH`, `Ali Panthers`, …) was replaced with names loaded from the local Room DB (`AdminLocalRepository.getAllTeamNames()`), seeded with a minimal starter set on first launch only.
+*   **Fixtures sync to the backend:** `FixtureRepository.saveFixtureWithSync()` now records the fixture as an `AdminFixtureEntity` with `tournamentId = "0"` and queues an `admin_fixture` create payload carrying team NAMES (so the backend auto-creates missing global teams) plus an ISO-parsed scheduled date (`toIsoDate()` converts `"19 Aug 2026"` → `"2026-08-19"`).
+*   **Operational match on Start:** `MainViewModel.startMatch()` (and Create Match's Start button via `CreateMatchViewModel.startFixture`) pushes the pending fixture (`pushPendingFixtureToServer`) and then calls the backend to create the operational match (`createOperationalMatchIfNeeded` → `POST /api/v1/custom/fixtures/{id}/create-match`), so started matches appear in the SuperAdmin Matches tab.
+*   **SyncManager dispatch repairs:** Queued entity types `"team"` and `"player"` (previously silently marked completed without any API call) now dispatch to the real push handlers. `"tournament"` creates are no longer queued (the tournament was already created by a direct API call — queueing pushed duplicates). Fixture status updates use the server ID (not local string IDs), map mobile `live` → backend `in_progress`, and route standalone fixtures to the new `custom/fixtures/{id}/status` and `DELETE custom/fixtures/{id}` endpoints. `normalizeScheduledAt()` repairs human-date payloads.
+*   **SyncWorker retry hygiene:** A periodic sync run that makes no progress for 3 consecutive attempts now finishes with `Result.failure` instead of retrying forever — this removes the exponential-backoff RETRY loop observed in the logcat (`crash.md`).
+*   **Backend additions:** SuperAdmin **Fixtures** tab (`/super-admin/fixtures`) listing every fixture including standalone ones; `DELETE /api/v1/custom/fixtures/{fixture}` endpoint; feature tests in `tests/Feature/Api/V1/CustomMatchSyncTest.php`; E2E manual checklist added to `guide.md` (Phase 14).
+
+## 📅 September 9, 2026: Lineup "Add Player" Flow Repairs
+*   **Symptom:** In the Toss & Lineup screen, tapping **Add Player → New Player** with a valid name did not add the player to the squad list.
+*   **Root cause — collect/append race:** `loadSquadsForMatch` collects Room's `players` table as a `Flow`. `registerNewPlayer` inserts the new player into that table (via `PlayerRepository.registerPlayer`), which RE-fired the active collector; the collector REPLACED `_homeSquad`/`_awaySquad` with the re-queried DB contents while the ViewModel's own `+ selectable` append raced against it, so the freshly added player could vanish from the UI list.
+*   **Root cause 2 — double launch:** Navigation fires `LaunchedEffect(matchId)` on every recomposition of the destination; `loadSquadsForMatch` had no re-entry guard, so a second launch reset the squads and re-collected mid-registration.
+*   **Fixes (LineupViewModel):**
+    1.  The new player is seeded into `_homeSquad`/`_awaySquad` IMMEDIATELY after the Room insert and BEFORE `pushPendingChanges()`, so any re-fired collect that queries the table includes the new row — the list can no longer lose it.
+    2.  `squadsLoaded` guard prevents double launches from resetting state.
+    3.  The `"player"` sync payload now always carries the resolved `teamId` (server ignores it today via `validate()`, but it keeps the device-side link explicit and future-proofs the endpoint). `pushPlayerChange` no longer has a dead duplicate branch.
+*   **Verified non-issues:** the Add Player dialog's role defaults to `"Batter"` (never blank), and the backend `CustomPlayerController` accepts the payload as-is.
+
+## 📅 September 9, 2026: Lineup "Add Player" — Root Cause v2 (the real one)
+*   **Why the v1 fix didn't work:** the race was real, but the deeper bug was the squad query KEY. Custom-match fixtures (`saveFixtureWithSync`) stored team NAMES with BLANK `homeTeamId`/`awayTeamId` on `AdminFixtureEntity`, and `LineupViewModel` never resolved the away team properly either. Result: `resolveOriginalTeamId("")` → `""`, players saved with `teamId = null`, collector queried `WHERE teamId = ''` (`null ≠ ''` matches nothing) — every players-table re-emission, including the insert that registered the new player, wiped it from the UI. Adding a player felt like a no-op.
+*   **Fixes:**
+    1.  **`LineupViewModel` rewritten** — squads now load ONCE per match via one-shot reads (`PlayerRepository.getPlayersByTeamOnce`); the live Room Flow collectors are GONE. After the initial load, the squad lists are append-only and the ViewModel is the single writer, so no DB re-emission can ever wipe a player again. Both team IDs are resolved BEFORE loading squads.
+    2.  **Team IDs resolve by NAME** — new `TeamRepository.resolveTeamIdByName(name)` (case-insensitive match against the admin team registry) and `resolveTeamName()` for display. Custom fixtures now prefer the stored NAME over the blank ID when resolving.
+    3.  **`FixtureRepository.saveFixtureWithSync`** now resolves and stores the real local team IDs on `AdminFixtureEntity` at save time (the sync payload still sends names + team id `0` — the backend auto-creates global teams by name and rejects local numeric IDs with 422).
+    4.  **`SyncManager` stale-queue guard** — `create` changes for entities already synced by a direct-push path (e.g. `pushPendingFixtureToServer`) are now marked complete instead of re-executing, preventing duplicate fixtures/teams on the backend. `SyncManager` now also injects `AdminTeamDao`/`AdminPlayerDao` for the check.
+*   **Verification steps (device):** Create Match → pick/create both teams → Save → Toss → Lineup → Add Player → New Player → the player must appear instantly in the squad list AND stay visible; repeat on the away tab; airplane-mode test must also keep the player in the list (queued sync) and push when back online.
+
+## 📅 September 9, 2026: Unified Real IDs + Copy-to-Clipboard (Backend ↔ App)
+*   **Goal:** IDs shown in the app must be the SAME stable identifiers the backend uses — unique, shared, and copyable with one tap (user request).
+*   **Backend identifier scheme (real codes):**
+    *   Team → `TEAM-XXXXX` (`teams.unique_code`, auto-generated, already existed).
+    *   Player → 6-digit profile code (`player_profiles.unique_code`, auto-generated, already existed).
+    *   Tournament → **NEW: `TRN-XXXXX`** auto-generated in `Tournament::booted()` (`tournament_code` column already existed but was never populated). Existing tournaments get a code lazily the next time their row is saved, or via `php artisan tinker --execute=...` backfill.
+*   **API changes:** `GET /api/v1/tournaments` + `/show` now include `tournament_code`; `GET /api/v1/tournaments/{t}/teams` now includes each team's `unique_code` (admin teams endpoint already returned it).
+*   **Mobile changes:**
+    *   New shared `ui/components/CopyableId.kt` — a pill showing `Label: ID` with a copy icon; one tap copies the real ID to the clipboard + toast confirmation.
+    *   `PlayerOverviewTab`: removed the fake 8-digit zero-padded ID; now shows the real profile unique code (fallback: raw ID until the code syncs) with copy action.
+    *   `TeamHomeTab`: shows copyable **Team ID (TEAM-XXXXX)** and copyable Tournament ID when no tournament name is linked.
+    *   `TournamentSetupScreen` team list: `Code: -` replaced with the copyable real code (hidden when the code hasn't synced yet).
+    *   `TournamentHubScreen` header: shows copyable `TRN-XXXXX` when available.
+    *   `TossLineupScreen` player search result: shows the player's unique code when synced (falls back to ID).
+    *   Room: `TeamEntity.teamCode` column added (DB version 15 → 16, destructive migration per project convention); the tournament-teams pull now stores `unique_code` into `teamCode`; `mirrorGlobalTeam` carries it too.
+
+---
+
 ## 📅 Initial Setup & Workspace Check
 *   **Workspace Analyzed**: The mobile codebase located in `cricket-draft-mobile/` is configured as a Jetpack Compose Android application containing a single `MainActivity.kt` with a basic greeting layout.
 *   **Rules & Logs System Initialized**:

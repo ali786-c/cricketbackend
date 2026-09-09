@@ -71,4 +71,14 @@ class PlayerRepository @Inject constructor(
 
     suspend fun getPlayersList(): List<RegisteredPlayer> =
         playerDao.getAllPlayers().first().map { it.toDomain() }
+
+    /**
+     * One-shot squad read (no Room Flow collector). Live collectors re-emit on
+     * every players-table write — including the insert that REGISTERS a new
+     * player — and the re-queried list races the append, wiping the new player
+     * from the UI. One-shot reads make the squad list append-only from the
+     * ViewModel's perspective.
+     */
+    suspend fun getPlayersByTeamOnce(teamId: String): List<RegisteredPlayer> =
+        playerDao.getPlayersByTeam(teamId).first().map { it.toDomain() }
 }

@@ -81,6 +81,20 @@ class AdminLocalRepository @Inject constructor(
         return team
     }
 
+    /**
+     * Distinct team names known locally (server-synced + device-created),
+     * used to seed the Create Match team picker.
+     */
+    suspend fun getAllTeamNames(): List<String> {
+        return adminTeamDao.getAllAdminTeams()
+            .asSequence()
+            .map { it.name.trim() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
+            .sorted()
+            .toList()
+    }
+
     suspend fun getTeamById(teamId: String): AdminTeamEntity? =
         adminTeamDao.findById(teamId)
 

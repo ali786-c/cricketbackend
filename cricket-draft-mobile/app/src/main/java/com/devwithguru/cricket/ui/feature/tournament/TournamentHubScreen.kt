@@ -125,12 +125,22 @@ fun TournamentHubScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Text(
-                            text = "Tournament Hub",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
+                        val trnCode = currentTournament?.tournamentCode?.takeIf { it.isNotBlank() }
+                        if (trnCode != null) {
+                            // Real backend identifier (TRN-XXXXX) — tap to copy
+                            com.devwithguru.cricket.ui.components.CopyableId(
+                                id = trnCode,
+                                label = "ID",
+                                fontSize = 10
+                            )
+                        } else {
+                            Text(
+                                text = "Tournament Hub",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 },
                 navigationIcon = {

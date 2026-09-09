@@ -568,6 +568,37 @@ interface ApiService {
         @Path("fixtureId") fixtureId: String
     ): Response<CreateMatchFromFixtureResponse>
 
+    /**
+     * Create an operational match from a standalone/custom fixture.
+     * POST /api/v1/custom/fixtures/{fixtureId}/create-match
+     */
+    @POST("api/v1/custom/fixtures/{fixtureId}/create-match")
+    suspend fun createCustomMatch(
+        @Header("Authorization") token: String,
+        @Path("fixtureId") fixtureId: String
+    ): Response<CreateMatchFromFixtureResponse>
+
+    /**
+     * Update a standalone/custom fixture status.
+     * POST /api/v1/custom/fixtures/{fixtureId}/status
+     */
+    @POST("api/v1/custom/fixtures/{fixtureId}/status")
+    suspend fun updateCustomFixtureStatus(
+        @Header("Authorization") token: String,
+        @Path("fixtureId") fixtureId: String,
+        @Body request: UpdateFixtureStatusRequest
+    ): Response<AdminFixtureResponse>
+
+    /**
+     * Delete a standalone/custom fixture.
+     * DELETE /api/v1/custom/fixtures/{fixtureId}
+     */
+    @DELETE("api/v1/custom/fixtures/{fixtureId}")
+    suspend fun deleteCustomFixture(
+        @Header("Authorization") token: String,
+        @Path("fixtureId") fixtureId: String
+    ): Response<Unit>
+
     // ─── Admin Draft Setup ─────────────────────────────────
 
     /**

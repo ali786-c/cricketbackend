@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devwithguru.cricket.ui.components.CopyableId
 import com.devwithguru.cricket.ui.theme.screenConfig
 
 @Composable
@@ -127,23 +128,13 @@ fun PlayerOverviewTab(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(99.dp))
-                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
-                    .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f), RoundedCornerShape(99.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val displayId = playerCode ?: (playerId.toLongOrNull()?.let { String.format("%08d", it) } ?: playerId)
-
-                Text(
-                    text = "Profile ID: $displayId",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
-                )
-            }
+            // Real backend identifier: the player profile's unique 6-digit code
+            // (PLR profile code). Falls back to the raw ID only when the code
+            // hasn't synced yet. One tap copies it to the clipboard.
+            CopyableId(
+                id = playerCode ?: playerId.takeIf { it.isNotBlank() },
+                label = "Profile ID"
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

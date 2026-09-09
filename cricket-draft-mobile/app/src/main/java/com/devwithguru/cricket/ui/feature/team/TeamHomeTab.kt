@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.devwithguru.cricket.data.api.SquadPlayerData
 import com.devwithguru.cricket.domain.model.Team
+import com.devwithguru.cricket.ui.components.CopyableId
 
 /**
  * Team Home Tab — PRD §10-§11
@@ -81,11 +82,16 @@ fun TeamHomeTab(
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         } else if (team?.tournamentId?.isNotBlank() == true) {
-                            Text(
-                                text = "Tournament ID: ${team.tournamentId}",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                            CopyableId(
+                                id = team.tournamentId,
+                                label = "Tournament",
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        if (team?.teamCode?.isNotBlank() == true) {
+                            CopyableId(
+                                id = team.teamCode,
+                                label = "Team ID",
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }

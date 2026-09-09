@@ -24,7 +24,7 @@ class TournamentController extends Controller
     public function teams(Tournament $tournament): JsonResponse
     {
         $this->ensurePublic($tournament);
-        return response()->json(['data' => $tournament->teams()->where('is_active', true)->withCount(['matchPlayers'])->orderBy('display_order')->get()->map(fn ($team) => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_path' => $team->logo_path, 'squad_count' => $team->match_players_count, 'creator_id' => $team->creator_id])->values()]);
+        return response()->json(['data' => $tournament->teams()->where('is_active', true)->withCount(['matchPlayers'])->orderBy('display_order')->get()->map(fn ($team) => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'unique_code' => $team->unique_code, 'logo_path' => $team->logo_path, 'squad_count' => $team->match_players_count, 'creator_id' => $team->creator_id])->values()]);
     }
 
     public function players(Tournament $tournament): JsonResponse
@@ -67,6 +67,7 @@ class TournamentController extends Controller
             'name' => $tournament->name,
             'season_name' => $tournament->season_name,
             'slug' => $tournament->slug,
+            'tournament_code' => $tournament->tournament_code,
             'status' => $tournament->status,
             'venue' => $tournament->venue ?: $tournament->location,
             'city' => $tournament->city,

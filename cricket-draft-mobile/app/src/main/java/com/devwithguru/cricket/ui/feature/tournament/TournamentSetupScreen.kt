@@ -438,7 +438,11 @@ private fun TeamsTabContent(
                                 }
                                 Column {
                                     Text(team.name ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text("Code: ${team.unique_code ?: "-"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    com.devwithguru.cricket.ui.components.CopyableId(
+                                        id = team.unique_code,
+                                        label = "Team ID",
+                                        fontSize = 10
+                                    )
                                 }
                             }
                             IconButton(onClick = { onDeleteTeam(team) }, modifier = Modifier.size(32.dp)) {
