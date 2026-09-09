@@ -28,6 +28,15 @@ interface ApiService {
     ): Response<LoginResponse>
 
     /**
+     * Register with name, email, password.
+     * POST /api/v1/auth/register
+     */
+    @POST("api/v1/auth/register")
+    suspend fun register(
+        @Body request: RegisterRequest
+    ): Response<LoginResponse>
+
+    /**
      * Get current user profile.
      * GET /api/v1/auth/me
      */
@@ -79,6 +88,15 @@ interface ApiService {
      */
     @GET("api/v1/tournaments")
     suspend fun getTournaments(): Response<TournamentListResponse>
+
+    /**
+     * List my created tournaments.
+     * GET /api/v1/admin/tournaments
+     */
+    @GET("api/v1/admin/tournaments")
+    suspend fun getAdminTournaments(
+        @Header("Authorization") token: String
+    ): Response<TournamentListResponse>
 
     /**
      * Get tournament details.
@@ -159,6 +177,16 @@ interface ApiService {
     ): Response<MvpResponse>
 
     // ─── Player Endpoints ───────────────────────────────────
+
+    /**
+     * Get player profile.
+     * GET /api/v1/players/{playerId}
+     */
+    @GET("api/v1/players/{playerId}")
+    suspend fun getPlayerProfile(
+        @Path("playerId") playerId: String,
+        @Header("Authorization") token: String? = null
+    ): Response<ProfileResponse>
 
     /**
      * Get player stats.

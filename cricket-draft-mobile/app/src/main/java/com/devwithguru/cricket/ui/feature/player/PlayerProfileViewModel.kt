@@ -50,18 +50,35 @@ class PlayerProfileViewModel @Inject constructor(
     fun loadPlayer(playerId: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            // Try Room first (instant, always works)
+            val token = try {
+                authRepository.getRawToken()?.let { "Bearer $it" }
+            } catch (_: Exception) { null }
+
+            // Fetch from API directly
             try {
-                var localPlayer = playerRepository.findById(playerId)
-                if (localPlayer != null) {
-                    _player.value = localPlayer
+                val result = playerApiRepository.getPlayerProfile(playerId, token)
+                result.onSuccess { data ->
+                    _player.value = RegisteredPlayer(
+                        id = data.id.toString(),
+                        name = data.full_name ?: "Unknown Player",
+                        role = data.playing_role ?: "Player",
+                        isRegistered = data.is_active,
+                        teamId = null
+                    )
+                }.onFailure {
+                    // Provide fallback if API fails
+                    val isCurrentUser = playerId == authRepository.getPlayerProfileId().toString()
+                    _player.value = RegisteredPlayer(
+                        id = playerId,
+                        name = if (isCurrentUser) authRepository.getUserName() else "Player Profile",
+                        role = "Player",
+                        isRegistered = true,
+                        teamId = null
+                    )
                 }
             } catch (_: Exception) { }
 
             // Try each API call individually — one failure shouldn't kill the rest
-            val token = try {
-                authRepository.getRawToken()?.let { "Bearer $it" }
-            } catch (_: Exception) { null }
 
             try {
                 val result = playerApiRepository.getPlayerStats(playerId, token)
@@ -90,16 +107,37 @@ class PlayerProfileViewModel @Inject constructor(
     }
 
     /**
-     * Load player from Room only.
+     * Load player from API.
      */
     fun loadPlayerProfile(playerId: String) {
         _isLoading.value = true
-        // Show Room data immediately
         viewModelScope.launch {
-            var localPlayer = playerRepository.findById(playerId)
-            if (localPlayer != null) {
-                _player.value = localPlayer
-            }
+            val token = try {
+                authRepository.getRawToken()?.let { "Bearer $it" }
+            } catch (_: Exception) { null }
+
+            try {
+                val result = playerApiRepository.getPlayerProfile(playerId, token)
+                result.onSuccess { data ->
+                    _player.value = RegisteredPlayer(
+                        id = data.id.toString(),
+                        name = data.full_name ?: "Unknown Player",
+                        role = data.playing_role ?: "Player",
+                        isRegistered = data.is_active,
+                        teamId = null
+                    )
+                }.onFailure {
+                    val isCurrentUser = playerId == authRepository.getPlayerProfileId().toString()
+                    _player.value = RegisteredPlayer(
+                        id = playerId,
+                        name = if (isCurrentUser) authRepository.getUserName() else "Player Profile",
+                        role = "Player",
+                        isRegistered = true,
+                        teamId = null
+                    )
+                }
+            } catch (_: Exception) { }
+            
             _isLoading.value = false
         }
     }

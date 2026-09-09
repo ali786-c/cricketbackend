@@ -126,5 +126,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('super-admin/users/{user}/revoke-sessions', [SuperAdminController::class, 'revokeUserSessions'])->middleware(['permission:manage system', 'throttle:30,1'])->name('api.v1.super-admin.users.revoke-sessions');
         Route::get('super-admin/tournaments', [SuperAdminController::class, 'tournaments'])->middleware(['permission:manage system'])->name('api.v1.super-admin.tournaments.index');
         Route::get('super-admin/tournaments/{tournament}', [SuperAdminController::class, 'tournament'])->middleware(['permission:manage system'])->name('api.v1.super-admin.tournaments.show');
+        Route::get('super-admin/matches', [SuperAdminController::class, 'matches'])->middleware(['permission:manage system'])->name('api.v1.super-admin.matches.index');
+        Route::get('super-admin/teams', [SuperAdminController::class, 'teams'])->middleware(['permission:manage system'])->name('api.v1.super-admin.teams.index');
+        Route::get('super-admin/players', [SuperAdminController::class, 'players'])->middleware(['permission:manage system'])->name('api.v1.super-admin.players.index');
     });
 });

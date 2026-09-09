@@ -76,33 +76,35 @@ object DatabaseModule {
     @Provides fun provideAdminFixtureDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminFixtureDao = db.adminFixtureDao()
     @Provides fun provideAdminDraftSetupDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.AdminDraftSetupDao = db.adminDraftSetupDao()
     @Provides fun provideStageDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.StageDao = db.stageDao()
+    @Provides fun provideUserProfileDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.UserProfileDao = db.userProfileDao()
+    @Provides fun providePlayerStatsDao(db: CricketDatabase): com.devwithguru.cricket.data.db.dao.PlayerStatsDao = db.playerStatsDao()
 
     @Provides
     @Named("auth_token")
     fun provideAuthToken(authRepository: com.devwithguru.cricket.data.repository.AuthRepository): () -> String? = { authRepository.getToken() }
 
     private fun defaultPlayers(): List<PlayerEntity> = listOf(
-        PlayerEntity("h1", "Ahmed Ali", "Batter", true),
-        PlayerEntity("h2", "Bilal Butt", "Batter", true),
-        PlayerEntity("h3", "Salman Ahmed", "Wicketkeeper", true),
-        PlayerEntity("h4", "Usman Shinwari", "Bowler", true),
-        PlayerEntity("h5", "Zain Abbas", "Batter", true),
-        PlayerEntity("h6", "Imran Khan", "All-rounder", true),
-        PlayerEntity("h7", "Farhan Saeed", "Bowler", true),
-        PlayerEntity("h8", "Riaz Afridi", "Bowler", true),
-        PlayerEntity("h9", "Asif Iqbal", "Batter", true),
-        PlayerEntity("h10", "Shoaib Malik", "All-rounder", true),
-        PlayerEntity("h11", "Wahab Riaz", "Bowler", true),
-        PlayerEntity("a1", "Yasir Khan", "Bowler", true),
-        PlayerEntity("a2", "Babar Azam", "Batter", true),
-        PlayerEntity("a3", "Mohammad Rizwan", "Wicketkeeper", true),
-        PlayerEntity("a4", "Shaheen Afridi", "Bowler", true),
-        PlayerEntity("a5", "Shadab Khan", "All-rounder", true),
-        PlayerEntity("a6", "Fakhar Zaman", "Batter", true),
-        PlayerEntity("a7", "Haris Rauf", "Bowler", true),
-        PlayerEntity("a8", "Naseem Shah", "Bowler", true),
-        PlayerEntity("a9", "Iftikhar Ahmed", "All-rounder", true),
-        PlayerEntity("a10", "Saim Ayub", "Batter", true),
-        PlayerEntity("a11", "Imad Wasim", "All-rounder", true)
+        PlayerEntity(id = "h1", playerProfileId = null, name = "Ahmed Ali", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h2", playerProfileId = null, name = "Bilal Butt", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h3", playerProfileId = null, name = "Salman Ahmed", role = "Wicketkeeper", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h4", playerProfileId = null, name = "Usman Shinwari", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h5", playerProfileId = null, name = "Zain Abbas", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h6", playerProfileId = null, name = "Imran Khan", role = "All-rounder", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h7", playerProfileId = null, name = "Farhan Saeed", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h8", playerProfileId = null, name = "Riaz Afridi", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h9", playerProfileId = null, name = "Asif Iqbal", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h10", playerProfileId = null, name = "Shoaib Malik", role = "All-rounder", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "h11", playerProfileId = null, name = "Wahab Riaz", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a1", playerProfileId = null, name = "Yasir Khan", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a2", playerProfileId = null, name = "Babar Azam", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a3", playerProfileId = null, name = "Mohammad Rizwan", role = "Wicketkeeper", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a4", playerProfileId = null, name = "Shaheen Afridi", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a5", playerProfileId = null, name = "Shadab Khan", role = "All-rounder", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a6", playerProfileId = null, name = "Fakhar Zaman", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a7", playerProfileId = null, name = "Haris Rauf", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a8", playerProfileId = null, name = "Naseem Shah", role = "Bowler", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a9", playerProfileId = null, name = "Iftikhar Ahmed", role = "All-rounder", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a10", playerProfileId = null, name = "Saim Ayub", role = "Batter", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved"),
+        PlayerEntity(id = "a11", playerProfileId = null, name = "Imad Wasim", role = "All-rounder", battingStyle = null, bowlingStyle = null, city = null, photoPath = null, isRegistered = true, teamId = null, status = "approved")
     )
 }

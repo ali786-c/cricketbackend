@@ -41,6 +41,9 @@ class TournamentViewModel @Inject constructor(
     private val _tournaments = MutableStateFlow<List<Tournament>>(emptyList())
     val tournaments: StateFlow<List<Tournament>> = _tournaments
 
+    private val _myTournaments = MutableStateFlow<List<Tournament>>(emptyList())
+    val myTournaments: StateFlow<List<Tournament>> = _myTournaments
+
     private val _currentTournament = MutableStateFlow<Tournament?>(null)
     val currentTournament: StateFlow<Tournament?> = _currentTournament
 
@@ -62,7 +65,7 @@ class TournamentViewModel @Inject constructor(
     /**
      * OFFLINE-FIRST: Load tournaments.
      * 1. Emit Room data instantly (always works, even offline)
-     * 2. Try API in background → save to Room → emit fresh data
+     * 2. Try API in background -> save to Room -> emit fresh data
      */
     fun loadAllTournaments() {
         _isLoading.value = true
@@ -85,9 +88,35 @@ class TournamentViewModel @Inject constructor(
                     }
                     // Room collector above will auto-update _tournaments
                 }
-                // If API fails, Room data is already showing — no error needed
+                // If API fails, Room data is already showing no error needed
             } catch (_: Exception) {
-                // Offline — Room data already showing, nothing to do
+                // Offline Room data already showing, nothing to do
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * OFFLINE-FIRST: Load my tournaments.
+     */
+    fun loadMyTournaments() {
+        _isLoading.value = true
+        viewModelScope.launch {
+            try {
+                val token = authRepository.getRawToken()
+                if (token != null) {
+                    val result = tournamentApiRepository.getAdminTournaments(token)
+                    result.onSuccess { apiTournaments ->
+                        val domainTournaments = apiTournaments.map { it.toDomain() }
+                        // Save each to Room for offline access
+                        domainTournaments.forEach { tournament ->
+                            tournamentRepository.saveTournament(tournament)
+                        }
+                        _myTournaments.value = domainTournaments
+                    }
+                }
+            } catch (_: Exception) {
             } finally {
                 _isLoading.value = false
             }
@@ -97,7 +126,7 @@ class TournamentViewModel @Inject constructor(
     /**
      * OFFLINE-FIRST: Load tournament details.
      * 1. Emit Room data instantly
-     * 2. Try API in background → save to Room → emit fresh data
+     * 2. Try API in background -> save to Room -> emit fresh data
      */
     fun loadTournament(id: String) {
         _isLoading.value = true
@@ -194,14 +223,14 @@ class TournamentViewModel @Inject constructor(
                 } catch (_: Exception) { }
 
             } catch (_: Exception) {
-                // Offline — Room data already showing
+                // Offline Room data already showing
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    // ─── Create Tournament via API ────────────────────────
+    //  Create Tournament via API 
     private val _createdTournamentId = MutableStateFlow<String?>(null)
     val createdTournamentId: StateFlow<String?> = _createdTournamentId
     private val _createError = MutableStateFlow<String?>(null)
@@ -244,6 +273,7 @@ class TournamentViewModel @Inject constructor(
                 squad_size = squadSize,
                 default_pick_duration = pickDuration,
                 default_overs_per_innings = overs,
+                is_public = visibility.equals("public", ignoreCase = true),
                 description = description.ifBlank { null },
                 organizer_name = organizerName.ifBlank { null },
                 contact_info = contactInfo.ifBlank { null },
@@ -255,7 +285,7 @@ class TournamentViewModel @Inject constructor(
                 // Save to Room so it appears in "My Tournaments" immediately
                 val domain = data.toDomain()
                 tournamentRepository.saveTournament(domain)
-                // Queue for sync tracking � ensures dedup on next pull
+                // Queue for sync tracking ensures dedup on next pull
                 syncManager.queueChange("tournament", data.id.toString(), "create", mapOf(
                     "serverId" to data.id,
                     "name" to name,
@@ -473,4 +503,3 @@ fun Fixture.toTournamentFixtureData2() = TournamentFixtureData2(
     toss_winner = tossWinner,
     toss_decision = tossDecision
 )
-

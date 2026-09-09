@@ -7,6 +7,8 @@ use App\Models\ApiClient;
 use App\Models\AuditLog;
 use App\Models\CricketMatch;
 use App\Models\Fixture;
+use App\Models\PlayerProfile;
+use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\TournamentPlayer;
 use App\Models\User;
@@ -186,6 +188,36 @@ class SuperAdminController extends Controller
         $this->ensureSuperAdmin($request);
         $tournament->loadCount(['teams', 'tournamentPlayers', 'matches', 'fixtures', 'auditLogs'])->load(['teams.captain.user', 'matches.fixture.homeTeam', 'matches.fixture.awayTeam', 'fixtures.homeTeam', 'fixtures.awayTeam']);
         return response()->json(['data' => $tournament]);
+    }
+
+    public function matches(Request $request): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $query = CricketMatch::with(['tournament', 'fixture.homeTeam', 'fixture.awayTeam'])->latest();
+        if ($status = $request->string('status')->toString()) {
+            $query->where('status', $status);
+        }
+        return response()->json(['data' => $query->paginate(50)->withQueryString()]);
+    }
+
+    public function teams(Request $request): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $query = Team::with('tournament')->latest();
+        if ($search = trim((string) $request->string('search'))) {
+            $query->where(fn ($builder) => $builder->where('name', 'like', "%{$search}%")->orWhere('short_name', 'like', "%{$search}%"));
+        }
+        return response()->json(['data' => $query->paginate(50)->withQueryString()]);
+    }
+
+    public function players(Request $request): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $query = PlayerProfile::with('user')->latest();
+        if ($search = trim((string) $request->string('search'))) {
+            $query->where(fn ($builder) => $builder->where('full_name', 'like', "%{$search}%")->orWhereHas('user', fn ($q) => $q->where('email', 'like', "%{$search}%")));
+        }
+        return response()->json(['data' => $query->paginate(50)->withQueryString()]);
     }
 
     private function filteredAuditQuery(Request $request)

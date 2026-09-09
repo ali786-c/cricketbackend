@@ -20,6 +20,9 @@ use App\Http\Controllers\SuperAdmin\DashboardController as SuperDashboardControl
 use App\Http\Controllers\SuperAdmin\GovernanceController as SuperGovernanceController;
 use App\Http\Controllers\SuperAdmin\TournamentController as SuperTournamentController;
 use App\Http\Controllers\SuperAdmin\UserController as SuperUserController;
+use App\Http\Controllers\SuperAdmin\MatchController as SuperMatchController;
+use App\Http\Controllers\SuperAdmin\TeamController as SuperTeamController;
+use App\Http\Controllers\SuperAdmin\PlayerController as SuperPlayerController;
 use App\Http\Controllers\Captain\DashboardController as CaptainDashboardController;
 use App\Http\Controllers\Captain\DraftController as CaptainDraftController;
 use App\Http\Controllers\Captain\ReportController as CaptainReportController;
@@ -317,6 +320,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
     Route::post('users/{user}/revoke-sessions', [SuperUserController::class, 'revokeSessions'])->middleware(['permission:manage system', 'throttle:30,1'])->name('users.sessions.revoke');
     Route::get('tournaments', [SuperTournamentController::class, 'index'])->middleware('permission:manage system')->name('tournaments.index');
     Route::get('tournaments/{tournament}', [SuperTournamentController::class, 'show'])->middleware('permission:manage system')->name('tournaments.show');
+    Route::get('matches', [SuperMatchController::class, 'index'])->middleware('permission:manage system')->name('matches.index');
+    Route::get('teams', [SuperTeamController::class, 'index'])->middleware('permission:manage system')->name('teams.index');
+    Route::get('players', [SuperPlayerController::class, 'index'])->middleware('permission:manage system')->name('players.index');
 });
 
 Route::middleware(['auth', 'verified', 'role:player'])->prefix('player')->name('player.')->group(function () {

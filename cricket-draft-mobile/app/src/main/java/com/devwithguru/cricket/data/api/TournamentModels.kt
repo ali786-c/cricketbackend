@@ -160,7 +160,7 @@ data class CreateTournamentRequest(
     val squad_size: Int = 11,
     val default_pick_duration: Int = 60,
     val default_overs_per_innings: Int? = null,
-    val is_public: Boolean = true,
+    val is_public: Boolean = false,
     val description: String? = null,
     val organizer_name: String? = null,
     val contact_info: String? = null,

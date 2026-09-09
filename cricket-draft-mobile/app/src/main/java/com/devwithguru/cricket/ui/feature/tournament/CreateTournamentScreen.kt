@@ -264,6 +264,36 @@ fun CreateTournamentScreen(
                         colors = defaultFieldColors(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Visibility Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Tournament Visibility", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Private tournaments are only visible to you", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                    }
+                    Row {
+                        Text(
+                            text = if (visibility == "public") "Public" else "Private",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Switch(
+                            checked = visibility == "public",
+                            onCheckedChange = { visibility = if (it) "public" else "private" },
+                            colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

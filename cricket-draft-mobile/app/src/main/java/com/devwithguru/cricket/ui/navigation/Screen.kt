@@ -2,6 +2,7 @@ package com.devwithguru.cricket.ui.navigation
 
 sealed interface Screen {
     object Login : Screen
+    object Register : Screen
     object Onboarding : Screen
     object Home : Screen
     data class CreateMatch(val tournamentId: String? = null, val defaultWickets: Int = 10) : Screen

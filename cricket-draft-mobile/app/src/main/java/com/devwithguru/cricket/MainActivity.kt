@@ -60,12 +60,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navigationViewModel = remember { NavigationViewModel() }
+                    val navigationViewModel: NavigationViewModel = hiltViewModel()
                     val currentScreen = navigationViewModel.currentScreen
                     val navigationStack = navigationViewModel.navigationStack
                     var loggedInEmail by remember { mutableStateOf("") }
                     val scorerViewModel: LiveScorerViewModel = hiltViewModel()
                     val mainViewModel: MainViewModel = hiltViewModel()
+                    val authViewModel: com.devwithguru.cricket.ui.feature.auth.AuthViewModel = hiltViewModel()
                     val currentFixture by mainViewModel.currentFixture.collectAsState()
                     val context = LocalContext.current
 
@@ -91,11 +92,22 @@ class MainActivity : ComponentActivity() {
                             LoginScreen(
                                 onLoginSuccess = { email ->
                                     loggedInEmail = email
-                                    navigationViewModel.navigateBack()
+                                    navigationViewModel.clearAndNavigateTo(Screen.Home)
                                     Toast.makeText(context, String.format(msgLoggedInFormat, email), Toast.LENGTH_SHORT).show()
                                 },
                                 onNavigateToRegister = {
-                                    navigationViewModel.navigateTo(Screen.Onboarding)
+                                    navigationViewModel.navigateTo(Screen.Register)
+                                }
+                            )
+                        }
+                        Screen.Register -> {
+                            com.devwithguru.cricket.ui.feature.auth.RegisterScreen(
+                                onRegisterSuccess = {
+                                    navigationViewModel.clearAndNavigateTo(Screen.Home)
+                                    Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
+                                },
+                                onNavigateToLogin = {
+                                    navigationViewModel.navigateBack()
                                 }
                             )
                         }
@@ -130,7 +142,12 @@ class MainActivity : ComponentActivity() {
                                     navigationViewModel.navigateTo(Screen.MyTeams)
                                 },
                                 onNavigateToPlayerProfile = {
-                                    navigationViewModel.navigateTo(Screen.PlayerProfile("p1"))
+                                    val profileId = authViewModel.getPlayerProfileId()
+                                    if (profileId != -1) {
+                                        navigationViewModel.navigateTo(Screen.PlayerProfile(profileId.toString()))
+                                    } else {
+                                        Toast.makeText(context, "Profile ID missing. Please log out and log back in.", Toast.LENGTH_LONG).show()
+                                    }
                                 },
                                 onNavigateToTournamentHub = { id ->
                                     navigationViewModel.navigateTo(Screen.TournamentHub(id))
@@ -145,6 +162,7 @@ class MainActivity : ComponentActivity() {
                                     navigationViewModel.navigateTo(Screen.GlobalSearch)
                                 },
                                 onLogout = {
+                                    authViewModel.logout()
                                     loggedInEmail = ""
                                     navigationViewModel.clearAndNavigateTo(Screen.Login)
                                     Toast.makeText(context, msgLoggedOut, Toast.LENGTH_SHORT).show()

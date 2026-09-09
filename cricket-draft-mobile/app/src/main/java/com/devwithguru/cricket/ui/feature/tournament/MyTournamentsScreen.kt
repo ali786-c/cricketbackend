@@ -39,11 +39,11 @@ fun MyTournamentsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterTab by remember { mutableStateOf("All") }
 
-    LaunchedEffect(Unit) { viewModel.loadAllTournaments() }
-    val allTournaments by viewModel.tournaments.collectAsState()
+    LaunchedEffect(Unit) { viewModel.loadMyTournaments() }
+    val myTournaments by viewModel.myTournaments.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
-    val filteredTournaments = allTournaments.filter { tournament ->
+    val filteredTournaments = myTournaments.filter { tournament ->
         val matchesSearch = tournament.name.contains(searchQuery, ignoreCase = true) ||
                             tournament.city.contains(searchQuery, ignoreCase = true)
         val matchesFilter = when (selectedFilterTab) {

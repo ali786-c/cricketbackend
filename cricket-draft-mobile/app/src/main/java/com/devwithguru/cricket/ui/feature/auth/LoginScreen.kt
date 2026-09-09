@@ -225,7 +225,7 @@ fun LoginScreen(
 
             // Secondary Register Action Link
             Text(
-                text = "Register as a Player/Captain",
+                text = "Don't have an account? Register",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 modifier = Modifier

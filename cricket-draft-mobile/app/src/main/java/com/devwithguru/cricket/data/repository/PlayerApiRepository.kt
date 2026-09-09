@@ -16,6 +16,24 @@ class PlayerApiRepository @Inject constructor(
     private val apiService: ApiService
 ) {
     /**
+     * Get player profile.
+     */
+    suspend fun getPlayerProfile(playerId: String, token: String? = null): Result<com.devwithguru.cricket.data.api.ProfileData> {
+        return try {
+            val response = apiService.getPlayerProfile(playerId, token)
+            if (response.isSuccessful) {
+                val data = response.body()?.data
+                if (data != null) Result.success(data)
+                else Result.failure(Exception("No data"))
+            } else {
+                Result.failure(Exception("Failed to load player profile"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Get player stats.
      */
     suspend fun getPlayerStats(playerId: String, token: String? = null): Result<PlayerStatsDetailData> {

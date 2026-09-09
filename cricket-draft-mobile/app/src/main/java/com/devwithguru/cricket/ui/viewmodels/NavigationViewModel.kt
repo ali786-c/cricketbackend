@@ -2,10 +2,18 @@ package com.devwithguru.cricket.ui.viewmodels
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
+import com.devwithguru.cricket.data.repository.AuthRepository
 import com.devwithguru.cricket.ui.navigation.Screen
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class NavigationViewModel : ViewModel() {
-    val navigationStack = mutableStateListOf<Screen>(Screen.Home)
+@HiltViewModel
+class NavigationViewModel @Inject constructor(
+    authRepository: AuthRepository
+) : ViewModel() {
+    val navigationStack = mutableStateListOf<Screen>(
+        if (authRepository.isLoggedIn()) Screen.Home else Screen.Login
+    )
 
     val currentScreen: Screen
         get() = navigationStack.lastOrNull() ?: Screen.Home

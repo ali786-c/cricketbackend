@@ -33,6 +33,22 @@ class TournamentApiRepository @Inject constructor(
     }
 
     /**
+     * List my created tournaments.
+     */
+    suspend fun getAdminTournaments(token: String): Result<List<TournamentData>> {
+        return try {
+            val response = apiService.getAdminTournaments(token)
+            if (response.isSuccessful) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception("Failed to load my tournaments"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Get tournament details.
      */
     suspend fun getTournament(tournamentId: String): Result<TournamentData> {

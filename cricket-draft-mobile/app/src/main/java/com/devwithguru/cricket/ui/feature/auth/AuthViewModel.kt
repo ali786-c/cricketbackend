@@ -71,7 +71,31 @@ class AuthViewModel @Inject constructor(
             )
         }
     }
+    fun register(name: String, email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
+            val result = authRepository.register(name, email, password)
+
+            result.fold(
+                onSuccess = { response ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoggedIn = true,
+                        userName = response.data.name,
+                        userEmail = response.data.email,
+                        error = null
+                    )
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message ?: "Registration failed."
+                    )
+                }
+            )
+        }
+    }
     /**
      * Check if we can auto-login from cache (no internet needed).
      */
@@ -82,6 +106,14 @@ class AuthViewModel @Inject constructor(
                 userName = authRepository.getUserName(),
                 userEmail = authRepository.getUserEmail()
             )
+            // Fetch latest data (like player_profile_id) in background
+            viewModelScope.launch {
+                try {
+                    authRepository.getMe()
+                } catch (e: Exception) {
+                    // Ignore errors, we are just trying to update the cache
+                }
+            }
             return true
         }
         return false
@@ -97,4 +129,6 @@ class AuthViewModel @Inject constructor(
     }
 
     fun getToken(): String? = authRepository.getToken()
+    
+    fun getPlayerProfileId(): Int = authRepository.getPlayerProfileId()
 }

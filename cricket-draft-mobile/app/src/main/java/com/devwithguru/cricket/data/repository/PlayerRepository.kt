@@ -26,8 +26,13 @@ class PlayerRepository @Inject constructor(
         val newId = (100000..999999).random().toString()
         val entity = com.devwithguru.cricket.data.db.entity.PlayerEntity(
             id = newId,
+            playerProfileId = null,
             name = name,
             role = role,
+            battingStyle = null,
+            bowlingStyle = null,
+            city = null,
+            photoPath = null,
             isRegistered = isRegistered,
             teamId = teamId
         )
@@ -39,8 +44,13 @@ class PlayerRepository @Inject constructor(
         val newId = (100000..999999).random().toString()
         val entity = com.devwithguru.cricket.data.db.entity.PlayerEntity(
             id = newId,
+            playerProfileId = null,
             name = name,
             role = role,
+            battingStyle = null,
+            bowlingStyle = null,
+            city = null,
+            photoPath = null,
             isRegistered = isRegistered,
             teamId = teamId
         )

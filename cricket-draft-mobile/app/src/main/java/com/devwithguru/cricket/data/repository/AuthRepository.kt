@@ -74,21 +74,56 @@ class AuthRepository @Inject constructor(
 
     // ─── User Data ─────────────────────────────────────────
 
-    fun saveUserData(id: Int, name: String, email: String, roles: List<String>) {
-        prefs.edit()
+    fun saveUserData(id: Int, name: String, email: String, roles: List<String>, playerProfileId: Int?) {
+        val editor = prefs.edit()
             .putInt(KEY_USER_ID, id)
             .putString(KEY_USER_NAME, name)
             .putString(KEY_USER_EMAIL, email)
             .putStringSet(KEY_USER_ROLES, roles.toSet())
-            .apply()
+            
+        if (playerProfileId != null) {
+            editor.putInt(KEY_PLAYER_PROFILE_ID, playerProfileId)
+        } else {
+            editor.remove(KEY_PLAYER_PROFILE_ID)
+        }
+        editor.apply()
     }
 
     fun getUserId(): Int = prefs.getInt(KEY_USER_ID, -1)
     fun getUserName(): String = prefs.getString(KEY_USER_NAME, "") ?: ""
     fun getUserEmail(): String = prefs.getString(KEY_USER_EMAIL, "") ?: ""
     fun getUserRoles(): Set<String> = prefs.getStringSet(KEY_USER_ROLES, emptySet()) ?: emptySet()
+    fun getPlayerProfileId(): Int = prefs.getInt(KEY_PLAYER_PROFILE_ID, -1)
 
     // ─── API Calls ─────────────────────────────────────────
+
+    /**
+     * Register with name, email, password. Returns LoginResponse on success.
+     */
+    suspend fun register(name: String, email: String, password: String): Result<LoginResponse> {
+        return try {
+            val response = apiService.register(
+                com.devwithguru.cricket.data.api.RegisterRequest(name = name, email = email, password = password)
+            )
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    // Save token
+                    saveToken(body.token)
+                    // Save user data
+                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles, body.data.player_profile?.id)
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("Empty response from server"))
+                }
+            } else {
+                val errorMsg = response.errorBody()?.string() ?: "Registration failed"
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     /**
      * Login with email/password. Returns LoginResponse on success.
@@ -104,7 +139,7 @@ class AuthRepository @Inject constructor(
                     // Save token
                     saveToken(body.token)
                     // Save user data
-                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles)
+                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles, body.data.player_profile?.id)
                     Result.success(body)
                 } else {
                     Result.failure(Exception("Empty response from server"))
@@ -128,7 +163,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles)
+                    saveUserData(body.data.id, body.data.name, body.data.email, body.data.roles, body.data.player_profile?.id)
                     Result.success(body.data)
                 } else {
                     Result.failure(Exception("Empty response"))
@@ -217,5 +252,6 @@ class AuthRepository @Inject constructor(
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_ROLES = "user_roles"
+        private const val KEY_PLAYER_PROFILE_ID = "player_profile_id"
     }
 }
