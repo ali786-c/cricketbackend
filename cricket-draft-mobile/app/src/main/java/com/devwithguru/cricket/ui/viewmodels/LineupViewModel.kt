@@ -6,6 +6,7 @@ import com.devwithguru.cricket.data.repository.PlayerRepository
 import com.devwithguru.cricket.data.repository.FixtureRepository
 import com.devwithguru.cricket.data.repository.TeamRepository
 import com.devwithguru.cricket.data.repository.TournamentRepository
+import com.devwithguru.cricket.data.sync.SyncManager
 import com.devwithguru.cricket.ui.feature.match.toss.PlayerSelectable
 import com.devwithguru.cricket.domain.model.RegisteredPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ class LineupViewModel @Inject constructor(
     private val playerRepository: PlayerRepository,
     private val fixtureRepository: FixtureRepository,
     private val teamRepository: TeamRepository,
-    private val tournamentRepository: TournamentRepository
+    private val tournamentRepository: TournamentRepository,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _homeSquad = MutableStateFlow<List<PlayerSelectable>>(emptyList())
@@ -43,6 +45,9 @@ class LineupViewModel @Inject constructor(
     var awayTeamId: String = ""
         private set
 
+    var matchTournamentId: String = "0"
+        private set
+
     fun loadSquadsForMatch(matchId: String) {
         _isLoading.value = true
         _homeSquad.value = emptyList()
@@ -55,6 +60,7 @@ class LineupViewModel @Inject constructor(
                 val originalAwayId = teamRepository.resolveOriginalTeamId(adminFixture.awayTeamId)
                 homeTeamId = originalHomeId
                 awayTeamId = originalAwayId
+                matchTournamentId = adminFixture.tournamentId
                 
                 val tournament = tournamentRepository.getTournamentById(adminFixture.tournamentId)
                 if (tournament != null) {
@@ -70,6 +76,7 @@ class LineupViewModel @Inject constructor(
                 if (scheduledFixture != null) {
                     homeTeamId = scheduledFixture.homeTeam
                     awayTeamId = scheduledFixture.awayTeam
+                    matchTournamentId = "0"
                     _squadSize.value = scheduledFixture.wickets + 1
                     
                     playerRepository.getPlayersByTeam(scheduledFixture.homeTeam).collect { list ->
@@ -140,6 +147,17 @@ class LineupViewModel @Inject constructor(
             } else {
                 _awaySquad.value = _awaySquad.value + selectable
             }
+            
+            // Immediately sync or queue offline
+            val payload = mapOf(
+                "action" to "create",
+                "name" to name,
+                "role" to role,
+                "tournamentId" to matchTournamentId
+            )
+            syncManager.queueChange("player", registered.id, "create", payload)
+            syncManager.pushPendingChanges()
+            
             onComplete(registered.id)
         }
     }

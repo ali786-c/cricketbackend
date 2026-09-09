@@ -54,6 +54,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('custom/teams', [CustomTeamController::class, 'store'])->name('api.v1.custom.teams.store');
+        Route::post('custom/players', [\App\Http\Controllers\Api\V1\CustomPlayerController::class, 'store'])->name('api.v1.custom.players.store');
         Route::post('custom/fixtures', [CustomFixtureController::class, 'store'])->name('api.v1.custom.fixtures.store');
         Route::put('custom/fixtures/{fixture}', [CustomFixtureController::class, 'update'])->name('api.v1.custom.fixtures.update');
         Route::post('custom/fixtures/{fixture}/status', [CustomFixtureController::class, 'status'])->name('api.v1.custom.fixtures.status');

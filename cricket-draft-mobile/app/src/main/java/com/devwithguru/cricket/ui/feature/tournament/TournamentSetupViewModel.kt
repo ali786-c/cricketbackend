@@ -25,6 +25,7 @@ import com.devwithguru.cricket.data.repository.PlayerRepository
 import com.devwithguru.cricket.data.repository.TeamRepository
 import com.devwithguru.cricket.domain.model.Team
 import com.devwithguru.cricket.data.sync.ConnectivityMonitor
+import com.devwithguru.cricket.data.sync.SyncManager
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +44,8 @@ class TournamentSetupViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val tournamentRepository: TournamentRepository,
     private val playerRepository: PlayerRepository,
-    private val teamRepository: TeamRepository
+    private val teamRepository: TeamRepository,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     // ─── Persisted UI State ────────────────────────────────
@@ -204,7 +206,7 @@ class TournamentSetupViewModel @Inject constructor(
         managerName: String? = null
     ) {
         viewModelScope.launch {
-            localRepo.createTeam(
+            val teamEntity = localRepo.createTeam(
                 tournamentId = tournamentId,
                 name = name,
                 shortName = shortName ?: name.take(3).uppercase(),
@@ -212,6 +214,17 @@ class TournamentSetupViewModel @Inject constructor(
                 viceCaptainName = viceCaptainName,
                 managerName = managerName
             )
+            
+            // Queue for offline sync and attempt to push immediately
+            val payload = mapOf(
+                "action" to "create",
+                "name" to name,
+                "shortName" to (shortName ?: name.take(3).uppercase()),
+                "tournamentId" to tournamentId
+            )
+            syncManager.queueChange("team", teamEntity.id, "create", payload)
+            syncManager.pushPendingChanges()
+
             _successMessage.value = "Team \"$name\" created"
         }
     }

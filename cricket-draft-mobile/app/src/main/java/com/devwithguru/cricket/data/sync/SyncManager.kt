@@ -184,7 +184,11 @@ class SyncManager @Inject constructor(
                 val name = payload["name"] as? String ?: return false
                 val shortName = payload["shortName"] as? String
                 val body = com.devwithguru.cricket.data.api.CreateTeamRequest(name, shortName)
-                val response = apiService.createTeam(authHeader, tournamentId, body)
+                val response = if (tournamentId == "0" || tournamentId.isEmpty()) {
+                    apiService.createCustomTeam(authHeader, body)
+                } else {
+                    apiService.createTeam(authHeader, tournamentId, body)
+                }
                 if (response.isSuccessful) {
                     val serverId = response.body()?.data?.id
                     if (serverId != null) {
@@ -206,6 +210,16 @@ class SyncManager @Inject constructor(
     private suspend fun pushPlayerChange(payload: Map<*, *>, authHeader: String): Boolean {
         val tournamentId = payload["tournamentId"] as? String ?: return false
         return when (payload["action"] as? String) {
+            "create" -> {
+                val name = payload["name"] as? String ?: return false
+                val role = payload["role"] as? String
+                val request = mapOf("name" to name, "role" to (role ?: ""))
+                if (tournamentId == "0" || tournamentId.isEmpty()) {
+                    apiService.createCustomPlayer(authHeader, request).isSuccessful
+                } else {
+                    apiService.createCustomPlayer(authHeader, request).isSuccessful // Admin player manual store is currently CustomPlayerController for global players
+                }
+            }
             "approve" -> {
                 val playerId = payload["playerId"] as? String ?: return false
                 apiService.approvePlayer(authHeader, tournamentId, playerId).isSuccessful

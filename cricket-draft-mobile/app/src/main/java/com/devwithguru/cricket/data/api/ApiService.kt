@@ -285,6 +285,18 @@ interface ApiService {
         @Body request: CreateTeamRequest
     ): Response<AdminTeamDataResponse>
 
+    @POST("api/v1/custom/teams")
+    suspend fun createCustomTeam(
+        @Header("Authorization") token: String,
+        @Body request: CreateTeamRequest
+    ): Response<AdminTeamDataResponse>
+
+    @POST("api/v1/custom/players")
+    suspend fun createCustomPlayer(
+        @Header("Authorization") token: String,
+        @Body request: Map<String, String>
+    ): Response<com.google.gson.JsonObject>
+
     /**
      * Delete a team.
      * DELETE /api/v1/admin/tournaments/{tournamentId}/teams/{teamId}
