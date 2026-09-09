@@ -14,7 +14,6 @@ class Team extends Model
     use HasFactory;
 
     protected $fillable = [
-        'tournament_id',
         'name',
         'short_name',
         'unique_code',

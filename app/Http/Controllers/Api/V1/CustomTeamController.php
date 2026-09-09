@@ -16,13 +16,14 @@ class CustomTeamController extends Controller
             'short_name' => ['nullable', 'string', 'max:10'],
         ]);
 
-        $team = Team::create([
-            'tournament_id' => null,
-            'name' => $data['name'],
-            'short_name' => $data['short_name'] ?? null,
-            'creator_id' => $request->user()->id,
-            'is_active' => true,
-        ]);
+        $team = Team::firstOrCreate(
+            ['name' => $data['name']],
+            [
+                'short_name' => $data['short_name'] ?? null,
+                'creator_id' => $request->user()->id,
+                'is_active' => true,
+            ]
+        );
 
         return response()->json(['data' => $team, 'message' => 'Custom team created successfully.'], 201);
     }
