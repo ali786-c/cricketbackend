@@ -5,7 +5,8 @@ package com.devwithguru.cricket.domain.model
  * Every player added to any team automatically gets a profile here.
  */
 data class RegisteredPlayer(
-    val id: String,
+    val id: String, // String to handle generic IDs from backend APIs if needed
+    val uniqueCode: String? = null,
     val name: String,
     val role: String,
     val isRegistered: Boolean = false, // true = has an account/login, false = added manually

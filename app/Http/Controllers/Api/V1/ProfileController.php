@@ -44,6 +44,7 @@ class ProfileController extends Controller
         return [
             'id' => $profile->id,
             'user_id' => $profile->user_id,
+            'unique_code' => $profile->unique_code,
             'full_name' => $profile->full_name,
             'phone' => $profile->phone,
             'city' => $profile->city,

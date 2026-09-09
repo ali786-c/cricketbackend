@@ -147,6 +147,7 @@ fun PlayerProfileScreen(
                     when (page) {
                         0 -> PlayerOverviewTab(
                             playerId = playerId,
+                            playerCode = registeredPlayer?.uniqueCode,
                             playerName = playerName,
                             stats = playerStats,
                             insights = playerInsights

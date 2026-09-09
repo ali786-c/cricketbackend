@@ -5,6 +5,7 @@ import com.devwithguru.cricket.domain.model.RegisteredPlayer
 
 fun PlayerEntity.toDomain() = RegisteredPlayer(
     id = id,
+    uniqueCode = uniqueCode,
     name = name,
     role = role ?: "Batter",
     isRegistered = isRegistered,
@@ -14,6 +15,7 @@ fun PlayerEntity.toDomain() = RegisteredPlayer(
 fun RegisteredPlayer.toEntity() = PlayerEntity(
     id = id,
     playerProfileId = null,
+    uniqueCode = uniqueCode,
     name = name,
     role = role,
     battingStyle = null,

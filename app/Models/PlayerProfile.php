@@ -43,7 +43,7 @@ class PlayerProfile extends Model
     public static function generateUniqueCode(): string
     {
         do {
-            $code = 'PLR-' . strtoupper(Str::random(5));
+            $code = (string) random_int(100000, 999999);
         } while (static::where('unique_code', $code)->exists());
 
         return $code;

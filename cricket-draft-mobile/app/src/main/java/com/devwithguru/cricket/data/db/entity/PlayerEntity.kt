@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class PlayerEntity(
     @PrimaryKey val id: String, // tournament_player_id
     val playerProfileId: Int?,
+    val uniqueCode: String? = null,
     val name: String,
     val role: String?,
     val battingStyle: String?,

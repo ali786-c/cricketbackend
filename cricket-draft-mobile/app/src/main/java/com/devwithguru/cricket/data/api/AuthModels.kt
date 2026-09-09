@@ -54,6 +54,7 @@ data class UserData(
 
 data class PlayerProfileData(
     val id: Int,
+    val unique_code: String?,
     val full_name: String?,
     val playing_role: String?
 )
@@ -65,6 +66,7 @@ data class ProfileResponse(
 data class ProfileData(
     val id: Int,
     val user_id: Int,
+    val unique_code: String?,
     val full_name: String?,
     val phone: String?,
     val city: String?,
