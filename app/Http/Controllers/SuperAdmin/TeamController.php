@@ -11,7 +11,7 @@ class TeamController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Team::with('tournament')->latest();
+        $query = Team::with('tournaments')->latest();
 
         if ($search = trim((string) $request->string('search'))) {
             $query->where(function ($builder) use ($search) {

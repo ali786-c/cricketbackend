@@ -20,29 +20,47 @@ class MatchService
     {
     }
 
-    public function createFromTeams(Tournament $tournament, int $homeTeamId, int $awayTeamId, ?int $fixtureId, int $actorId, ?int $oversPerInnings = null): CricketMatch
+    public function createFromTeams(?Tournament $tournament, int $homeTeamId, int $awayTeamId, ?int $fixtureId, int $actorId, ?int $oversPerInnings = null): CricketMatch
     {
         return $this->database->transaction(function () use ($tournament, $homeTeamId, $awayTeamId, $fixtureId, $actorId, $oversPerInnings) {
-            $tournament = Tournament::query()->with('cricketRuleProfile')->lockForUpdate()->findOrFail($tournament->id);
-            $profile = $tournament->cricketRuleProfile;
+            $profile = null;
+            if ($tournament) {
+                $tournament = Tournament::query()->with('cricketRuleProfile')->lockForUpdate()->findOrFail($tournament->id);
+                $profile = $tournament->cricketRuleProfile;
 
-            // Auto-create a default rule profile if none exists
-            if (! $profile || ! $profile->is_active) {
-                $profile = CricketRuleProfile::updateOrCreate(
-                    ['slug' => 'default-' . $tournament->id, 'is_active' => true],
-                    [
-                        'name' => 'Default Rules (' . $tournament->name . ')',
+                // Auto-create a default rule profile if none exists
+                if (! $profile || ! $profile->is_active) {
+                    $profile = CricketRuleProfile::updateOrCreate(
+                        ['slug' => 'default-' . $tournament->id, 'is_active' => true],
+                        [
+                            'name' => 'Default Rules (' . $tournament->name . ')',
+                            'format' => 'T20',
+                            'overs_per_innings' => $tournament->default_overs_per_innings ?? 20,
+                            'wickets_per_innings' => 10,
+                            'playing_xi_size' => 11,
+                            'max_over_per_bowler' => 4,
+                            'version' => 1,
+                            'is_active' => true,
+                        ]
+                    );
+                }
+                $tournament->update(['cricket_rule_profile_id' => $profile->id]);
+                $profile = $tournament->fresh('cricketRuleProfile')->cricketRuleProfile;
+            } else {
+                $profile = CricketRuleProfile::where('slug', 'default-custom')->first();
+                if (!$profile) {
+                    $profile = CricketRuleProfile::create([
+                        'name' => 'Default Custom Rules',
+                        'slug' => 'default-custom',
                         'format' => 'T20',
-                        'overs_per_innings' => $tournament->default_overs_per_innings ?? 20,
+                        'overs_per_innings' => 20,
                         'wickets_per_innings' => 10,
                         'playing_xi_size' => 11,
                         'max_over_per_bowler' => 4,
                         'version' => 1,
                         'is_active' => true,
-                    ]
-                );
-                $tournament->update(['cricket_rule_profile_id' => $profile->id]);
-                $profile = $tournament->fresh('cricketRuleProfile')->cricketRuleProfile;
+                    ]);
+                }
             }
 
             $teamIds = collect([$homeTeamId, $awayTeamId])->map(fn ($id) => (int) $id);
@@ -50,42 +68,49 @@ class MatchService
                 $this->fail('teams', 'A match requires two different teams.');
             }
 
-            $teams = $tournament->teams()->whereIn('id', $teamIds)->orderBy('display_order')->get();
-            if ($teams->count() !== 2) {
-                $this->fail('teams', 'Both teams must belong to this tournament.');
-            }
+            if ($tournament) {
+                $teams = $tournament->teams()->whereIn('id', $teamIds)->orderBy('display_order')->get();
+                if ($teams->count() !== 2) {
+                    $this->fail('teams', 'Both teams must belong to this tournament.');
+                }
 
-            $draft = $tournament->draft()->with(['picks.tournamentPlayer.playerProfile'])->lockForUpdate()->first();
-            if (! $draft || ! $this->draftIsComplete($draft)) {
-                $this->fail('match', 'The tournament draft must be completed before a match can be created.');
-            }
+                $draft = $tournament->draft()->with(['picks.tournamentPlayer.playerProfile'])->lockForUpdate()->first();
+                if (! $draft || ! $this->draftIsComplete($draft)) {
+                    $this->fail('match', 'The tournament draft must be completed before a match can be created.');
+                }
 
-            $selectedPicks = $draft->picks
-                ->where('status', 'selected')
-                ->whereIn('team_id', $teamIds)
-                ->values();
-            if ($selectedPicks->isEmpty() || $selectedPicks->pluck('team_id')->unique()->count() !== 2) {
-                $this->fail('teams', 'Both teams must have drafted players before a match can be created.');
-            }
+                $selectedPicks = $draft->picks
+                    ->where('status', 'selected')
+                    ->whereIn('team_id', $teamIds)
+                    ->values();
+                if ($selectedPicks->isEmpty() || $selectedPicks->pluck('team_id')->unique()->count() !== 2) {
+                    $this->fail('teams', 'Both teams must have drafted players before a match can be created.');
+                }
 
-            $playerIds = $selectedPicks->pluck('tournament_player_id')->filter();
-            if ($playerIds->count() !== $playerIds->unique()->count()) {
-                $this->fail('players', 'A drafted player cannot appear twice in a match squad.');
-            }
-            foreach ($selectedPicks as $pick) {
-                if (! $pick->tournamentPlayer || $pick->tournamentPlayer->status !== 'approved') {
-                    $this->fail('players', 'Every match player must be an approved tournament player.');
+                $playerIds = $selectedPicks->pluck('tournament_player_id')->filter();
+                if ($playerIds->count() !== $playerIds->unique()->count()) {
+                    $this->fail('players', 'A drafted player cannot appear twice in a match squad.');
+                }
+                foreach ($selectedPicks as $pick) {
+                    if (! $pick->tournamentPlayer || $pick->tournamentPlayer->status !== 'approved') {
+                        $this->fail('players', 'Every match player must be an approved tournament player.');
+                    }
+                }
+            } else {
+                $teams = \App\Models\Team::whereIn('id', $teamIds)->get();
+                if ($teams->count() !== 2) {
+                    $this->fail('teams', 'Both custom teams must exist.');
                 }
             }
 
-            $effectiveOvers = $oversPerInnings ?? $tournament->default_overs_per_innings ?? $profile->overs_per_innings;
+            $effectiveOvers = $oversPerInnings ?? ($tournament ? $tournament->default_overs_per_innings : 20) ?? $profile->overs_per_innings;
             if ($effectiveOvers < 1 || $effectiveOvers > 100) {
                 $this->fail('overs_per_innings', 'Overs per innings must be between 1 and 100.');
             }
 
             $match = CricketMatch::create([
                 'fixture_id' => $fixtureId,
-                'tournament_id' => $tournament->id,
+                'tournament_id' => $tournament ? $tournament->id : null,
                 'rule_profile_id' => $profile->id,
                 'rule_profile_version' => $profile->version,
                 'overs_per_innings' => $effectiveOvers,
@@ -96,17 +121,19 @@ class MatchService
                 'updated_by' => $actorId,
             ]);
 
-            foreach ($selectedPicks as $pick) {
-                $profileData = $pick->tournamentPlayer->playerProfile;
-                MatchPlayer::create([
-                    'match_id' => $match->id,
-                    'team_id' => $pick->team_id,
-                    'tournament_player_id' => $pick->tournament_player_id,
-                    'draft_pick_id' => $pick->id,
-                    'player_name_snapshot' => $profileData->full_name,
-                    'player_role_snapshot' => $profileData->playing_role,
-                    'selection_type' => 'squad',
-                ]);
+            if ($tournament) {
+                foreach ($selectedPicks as $pick) {
+                    $profileData = $pick->tournamentPlayer->playerProfile;
+                    MatchPlayer::create([
+                        'match_id' => $match->id,
+                        'team_id' => $pick->team_id,
+                        'tournament_player_id' => $pick->tournament_player_id,
+                        'draft_pick_id' => $pick->id,
+                        'player_name_snapshot' => $profileData->full_name,
+                        'player_role_snapshot' => $profileData->playing_role,
+                        'selection_type' => 'squad',
+                    ]);
+                }
             }
 
             return $match->load(['players.team', 'ruleProfile']);
