@@ -134,8 +134,13 @@ fun PlayerOverviewTab(
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Format the ID to an 8-digit string
+                val formattedId = playerId.toLongOrNull()?.let { 
+                    String.format("%08d", it) 
+                } ?: playerId
+
                 Text(
-                    text = "Profile ID: $playerId",
+                    text = "Profile ID: $formattedId",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.SansSerif,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
