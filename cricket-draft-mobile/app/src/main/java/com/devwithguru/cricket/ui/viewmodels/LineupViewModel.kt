@@ -66,7 +66,19 @@ class LineupViewModel @Inject constructor(
                     _isLoading.value = false
                 }
             } else {
-                _isLoading.value = false
+                val scheduledFixture = fixtureRepository.getScheduledFixtureById(matchId)
+                if (scheduledFixture != null) {
+                    homeTeamId = scheduledFixture.homeTeam
+                    awayTeamId = scheduledFixture.awayTeam
+                    _squadSize.value = scheduledFixture.wickets + 1
+                    
+                    playerRepository.getPlayersByTeam(scheduledFixture.homeTeam).collect { list ->
+                        _homeSquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                        _isLoading.value = false
+                    }
+                } else {
+                    _isLoading.value = false
+                }
             }
         }
         viewModelScope.launch {
@@ -81,7 +93,15 @@ class LineupViewModel @Inject constructor(
                     _isLoading.value = false
                 }
             } else {
-                _isLoading.value = false
+                val scheduledFixture = fixtureRepository.getScheduledFixtureById(matchId)
+                if (scheduledFixture != null) {
+                    playerRepository.getPlayersByTeam(scheduledFixture.awayTeam).collect { list ->
+                        _awaySquad.value = list.map { PlayerSelectable(it.id, it.name, it.role) }
+                        _isLoading.value = false
+                    }
+                } else {
+                    _isLoading.value = false
+                }
             }
         }
     }
