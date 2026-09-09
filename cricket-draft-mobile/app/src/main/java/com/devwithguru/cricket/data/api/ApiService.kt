@@ -333,6 +333,13 @@ interface ApiService {
 
     // ─── Admin Player Endpoints ────────────────────────────
 
+    @POST("api/v1/admin/tournaments/{tournamentId}/players/manual")
+    suspend fun createTournamentPlayer(
+        @Header("Authorization") token: String,
+        @Path("tournamentId") tournamentId: String,
+        @Body request: CreatePlayerRequest
+    ): Response<com.google.gson.JsonObject>
+
     /**
      * List registered players for a tournament.
      * GET /api/v1/admin/tournaments/{tournamentId}/players

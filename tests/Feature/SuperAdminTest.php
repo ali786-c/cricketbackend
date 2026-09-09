@@ -118,6 +118,96 @@ class SuperAdminTest extends TestCase
         $this->actingAs($superAdmin)->get(route('super-admin.health'))->assertOk()->assertSee('System health');
     }
 
+    public function test_super_admin_match_center_shows_full_match_details(): void
+    {
+        $superAdmin = $this->userWithRole('super_admin');
+
+        $ruleProfile = \App\Models\CricketRuleProfile::create(['name' => 'Test 6 Over', 'slug' => 'test-6-over', 'format' => 't20', 'overs_per_innings' => 6, 'legal_balls_per_over' => 6]);
+        $homeTeam = \App\Models\Team::create(['name' => 'Lahore Lions', 'short_name' => 'LHR']);
+        $awayTeam = \App\Models\Team::create(['name' => 'Karachi Kings', 'short_name' => 'KHI']);
+        $tournament = Tournament::create(['name' => 'Center Cup', 'slug' => 'center-cup', 'status' => 'live', 'is_public' => true, 'timezone' => 'Asia/Karachi', 'cricket_rule_profile_id' => $ruleProfile->id]);
+        $fixture = \App\Models\Fixture::create(['tournament_id' => $tournament->id, 'home_team_id' => $homeTeam->id, 'away_team_id' => $awayTeam->id, 'status' => 'in_progress', 'scheduled_at' => now(), 'venue' => 'Gaddafi Stadium']);
+
+        $match = \App\Models\CricketMatch::create(['fixture_id' => $fixture->id, 'tournament_id' => $tournament->id, 'rule_profile_id' => $ruleProfile->id, 'overs_per_innings' => 6, 'status' => 'live', 'revision' => 6]);
+
+        $ayan = \App\Models\MatchPlayer::create(['match_id' => $match->id, 'team_id' => $homeTeam->id, 'player_name_snapshot' => 'Ayan', 'player_role_snapshot' => 'Batsman', 'selection_type' => 'playing_xi', 'batting_order' => 1]);
+        $umar = \App\Models\MatchPlayer::create(['match_id' => $match->id, 'team_id' => $homeTeam->id, 'player_name_snapshot' => 'Umar', 'selection_type' => 'playing_xi', 'batting_order' => 2]);
+        $bilal = \App\Models\MatchPlayer::create(['match_id' => $match->id, 'team_id' => $homeTeam->id, 'player_name_snapshot' => 'Bilal', 'selection_type' => 'playing_xi', 'batting_order' => 3]);
+        $sam = \App\Models\MatchPlayer::create(['match_id' => $match->id, 'team_id' => $awayTeam->id, 'player_name_snapshot' => 'Sam', 'player_role_snapshot' => 'Bowler', 'selection_type' => 'playing_xi', 'batting_order' => 1, 'is_captain' => true]);
+        $zain = \App\Models\MatchPlayer::create(['match_id' => $match->id, 'team_id' => $awayTeam->id, 'player_name_snapshot' => 'Zain', 'selection_type' => 'playing_xi', 'batting_order' => 2]);
+
+        $innings = \App\Models\MatchInnings::create(['match_id' => $match->id, 'innings_number' => 1, 'batting_team_id' => $homeTeam->id, 'bowling_team_id' => $awayTeam->id, 'status' => 'live', 'maximum_overs' => 6, 'total_runs' => 13, 'wickets' => 2, 'legal_balls' => 6]);
+        $match->update(['current_innings_id' => $innings->id]);
+
+        $ballSpecs = [
+            ['over' => 1, 'ball' => 1, 'runs' => 4, 'striker' => $ayan],
+            ['over' => 1, 'ball' => 2, 'runs' => 0, 'striker' => $ayan, 'wicket' => ['dismissed' => $ayan, 'type' => 'caught', 'fielder' => $zain]],
+            ['over' => 1, 'ball' => 3, 'runs' => 1, 'striker' => $bilal],
+            ['over' => 1, 'ball' => 4, 'runs' => 0, 'striker' => $bilal, 'wicket' => ['dismissed' => $bilal, 'type' => 'bowled']],
+            ['over' => 1, 'ball' => 5, 'runs' => 6, 'striker' => $umar],
+            ['over' => 1, 'ball' => 6, 'runs' => 2, 'striker' => $umar],
+        ];
+        foreach ($ballSpecs as $index => $spec) {
+            $delivery = \App\Models\MatchDelivery::create([
+                'match_id' => $match->id, 'innings_id' => $innings->id,
+                'over_number' => $spec['over'], 'ball_number' => $spec['ball'], 'sequence_number' => $index + 1,
+                'striker_id' => $spec['striker']->id, 'non_striker_id' => ($spec['striker']->is($ayan) || $spec['striker']->is($bilal)) ? $umar->id : $ayan->id,
+                'bowler_id' => $sam->id, 'runs_off_bat' => $spec['runs'], 'total_runs' => $spec['runs'],
+                'is_legal_delivery' => true, 'recorded_at' => now(), 'revision' => $index + 1,
+            ]);
+            if (isset($spec['wicket'])) {
+                $wicket = \App\Models\MatchWicket::create(['delivery_id' => $delivery->id, 'dismissed_player_id' => $spec['wicket']['dismissed']->id, 'dismissal_type' => $spec['wicket']['type'], 'credited_bowler_id' => $sam->id, 'fielder_id' => $spec['wicket']['fielder']->id ?? null, 'is_valid_wicket' => true]);
+                $delivery->update(['wicket_id' => $wicket->id]);
+            }
+        }
+
+        \App\Models\InningsBattingStat::create(['innings_id' => $innings->id, 'match_player_id' => $ayan->id, 'batting_position' => 1, 'runs' => 12, 'balls' => 9, 'fours' => 2, 'sixes' => 1, 'strike_rate' => 133.33, 'dismissal_type' => 'caught', 'dismissed_by' => $sam->id, 'fielder_id' => $zain->id, 'status' => 'out']);
+        \App\Models\InningsBattingStat::create(['innings_id' => $innings->id, 'match_player_id' => $bilal->id, 'batting_position' => 3, 'runs' => 1, 'balls' => 2, 'fours' => 0, 'sixes' => 0, 'strike_rate' => 50, 'dismissal_type' => 'bowled', 'dismissed_by' => $sam->id, 'status' => 'out']);
+        \App\Models\InningsBattingStat::create(['innings_id' => $innings->id, 'match_player_id' => $umar->id, 'batting_position' => 2, 'runs' => 0, 'balls' => 0, 'fours' => 0, 'sixes' => 0, 'strike_rate' => 0, 'status' => 'did_not_bat']);
+        \App\Models\InningsBowlingStat::create(['innings_id' => $innings->id, 'match_player_id' => $sam->id, 'legal_balls' => 6, 'maidens' => 0, 'runs_conceded' => 13, 'wickets' => 2, 'no_balls' => 0, 'wides' => 0, 'economy' => 13]);
+
+        // Matches directory links into the Match Center.
+        $this->actingAs($superAdmin)->get(route('super-admin.matches.index'))
+            ->assertOk()
+            ->assertSee(route('super-admin.matches.show', $match));
+
+        $this->actingAs($superAdmin)->get(route('super-admin.matches.show', $match))
+            ->assertOk()
+            ->assertSee('Match Center')
+            ->assertSee('Center Cup')
+            ->assertSee('Lahore Lions')
+            ->assertSee('Karachi Kings')
+            ->assertSee('13/2')
+            ->assertSee('Ayan')
+            ->assertSee('Caught (Zain) b Sam')
+            ->assertSee('Fall of wickets')
+            ->assertSee('13/2')
+            ->assertSee("p'ship 4 (2)", false)
+            ->assertSee('Gaddafi Stadium')
+            ->assertSee('Super Stars')
+            ->assertSee('Squads');
+
+        // A regular admin has no access to the super admin control plane.
+        $this->actingAs($this->userWithRole('admin'))->get(route('super-admin.matches.show', $match))->assertForbidden();
+    }
+
+    public function test_super_admin_match_center_works_for_standalone_custom_matches(): void
+    {
+        $superAdmin = $this->userWithRole('super_admin');
+
+        $ruleProfile = \App\Models\CricketRuleProfile::create(['name' => 'Custom 5 Over', 'slug' => 'custom-5-over', 'format' => 't20', 'overs_per_innings' => 5, 'legal_balls_per_over' => 6]);
+        $homeTeam = \App\Models\Team::create(['name' => 'Street Warriors', 'short_name' => 'STW']);
+        $awayTeam = \App\Models\Team::create(['name' => 'Gully Stars', 'short_name' => 'GUL']);
+        $fixture = \App\Models\Fixture::create(['tournament_id' => null, 'home_team_id' => $homeTeam->id, 'away_team_id' => $awayTeam->id, 'status' => 'completed', 'scheduled_at' => now()]);
+        $match = \App\Models\CricketMatch::create(['fixture_id' => $fixture->id, 'tournament_id' => null, 'rule_profile_id' => $ruleProfile->id, 'overs_per_innings' => 5, 'status' => 'completed', 'result_type' => 'win', 'result_summary' => 'Street Warriors won by 12 runs']);
+
+        $this->actingAs($superAdmin)->get(route('super-admin.matches.show', $match))
+            ->assertOk()
+            ->assertSee('Custom Match')
+            ->assertSee('Street Warriors won by 12 runs')
+            ->assertSee('Innings have not started yet');
+    }
+
     private function userWithRole(string $role): User
     {
         $user = User::factory()->create();

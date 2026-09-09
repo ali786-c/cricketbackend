@@ -848,7 +848,7 @@ fun CreateMatchScreen(
                                         val loc = newTeamLocation.trim().takeIf { it.isNotBlank() }
                                         // REAL creation: saves to Room, queues sync, pushes
                                         // to /api/v1/custom/teams → appears in SuperAdmin Teams
-                                        viewModel.createTeam(name, loc) { _, createdName ->
+                                        viewModel.createTeam(name, loc, tournamentId) { _, createdName ->
                                             existingTeams.add(0, createdName)
                                             if (activeSelectingTeamSide == "A") {
                                                 homeTeam = createdName

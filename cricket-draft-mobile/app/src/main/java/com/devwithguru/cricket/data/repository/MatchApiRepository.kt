@@ -107,7 +107,9 @@ class MatchApiRepository @Inject constructor(
                             awayTeam = finalAway,
                             venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
                             date = if (fixture.date.isBlank()) cached.date else fixture.date,
-                            time = if (fixture.time.isBlank()) cached.time else fixture.time
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time,
+                            wickets = cached.wickets,
+                            overs = cached.overs
                         )
                     }
 

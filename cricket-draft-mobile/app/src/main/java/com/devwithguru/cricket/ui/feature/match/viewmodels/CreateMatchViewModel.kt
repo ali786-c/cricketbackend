@@ -40,16 +40,17 @@ class CreateMatchViewModel @Inject constructor(
      * to push it to the backend. The callback fires with the local team ID and
      * name so the caller can select it for a side without waiting for the network.
      */
-    fun createTeam(name: String, location: String?, onCreated: (id: String, teamName: String) -> Unit = { _, _ -> }) {
+    fun createTeam(name: String, location: String?, tournamentId: String? = null, onCreated: (id: String, teamName: String) -> Unit = { _, _ -> }) {
         val trimmedName = name.trim()
         if (trimmedName.isBlank()) return
 
         viewModelScope.launch {
             _isSaving.value = true
             try {
-                // "0" = standalone match → global team via /api/v1/custom/teams
+                // Use the provided tournamentId, or "0" for standalone matches (global teams)
+                val targetTournamentId = tournamentId.takeIf { !it.isNullOrBlank() } ?: "0"
                 val team = adminLocalRepository.createTeam(
-                    tournamentId = "0",
+                    tournamentId = targetTournamentId,
                     name = trimmedName,
                     shortName = trimmedName.take(3).uppercase()
                 )

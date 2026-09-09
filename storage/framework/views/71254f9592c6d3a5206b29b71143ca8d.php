@@ -11,11 +11,14 @@
     <?php
         $workspace = route('login');
         if (auth()->check()) {
-            $workspace = auth()->user()->hasRole('super_admin') ? route('super-admin.dashboard') : $workspace;
-            $workspace = auth()->user()->hasRole('admin') ? route('admin.dashboard') : $workspace;
-            $workspace = auth()->user()->hasRole('captain') ? route('captain.dashboard') : $workspace;
-            $workspace = auth()->user()->hasRole('player') ? route('player.tournaments.index') : $workspace;
-            $workspace = !auth()->user()->hasAnyRole(['super_admin', 'admin', 'captain', 'player']) ? route('dashboard') : $workspace;
+            $user = auth()->user();
+            $workspace = match (true) {
+                $user->hasRole('super_admin') => route('super-admin.dashboard'),
+                $user->hasRole('admin') => route('admin.dashboard'),
+                $user->hasRole('captain') => route('captain.dashboard'),
+                $user->hasRole('player') => route('player.tournaments.index'),
+                default => route('dashboard'),
+            };
         }
         $featuredTournament = $featured['tournament'] ?? null;
         $featuredState = $featured['state'] ?? null;

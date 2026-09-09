@@ -257,6 +257,7 @@ class SyncManager @Inject constructor(
                     if (serverId != null) {
                         // MAP local ID → server ID so next pull won't duplicate
                         teamDao.updateServerId(change.entityId, serverId)
+                        adminTeamDao.updateServerId(change.entityId, serverId, "synced")
                     }
                     true
                 } else false
@@ -276,16 +277,37 @@ class SyncManager @Inject constructor(
             "create" -> {
                 val name = payload["name"] as? String ?: return false
                 val role = payload["role"] as? String
+                var teamIdStr = payload["teamId"] as? String
+
+                // If it's a local offline ID (pure digits and no mapping exists yet), lookup its server ID.
+                // If it hasn't synced to the server yet, we must abort this player sync until the team syncs.
+                if (teamIdStr != null && teamIdStr.all { it.isDigit() }) {
+                    val adminTeam = adminTeamDao.findById(teamIdStr)
+                    val serverId = adminTeam?.serverId ?: teamDao.findByServerId(teamIdStr.toIntOrNull() ?: -1)?.serverId
+                    if (serverId != null) {
+                        teamIdStr = serverId.toString()
+                    } else if (adminTeam != null) {
+                        // The team is a local team that hasn't successfully synced to the backend yet.
+                        throw Exception("Team not synced yet")
+                    }
+                }
+
                 val request = buildMap<String, String> {
                     put("name", name)
                     put("role", role ?: "")
-                    val teamId = payload["teamId"] as? String
-                    if (!teamId.isNullOrBlank()) put("team_id", teamId)
+                    if (!teamIdStr.isNullOrBlank()) put("team_id", teamIdStr)
                 }
-                // Both paths use the global guest-player endpoint; the payload's
-                // teamId keeps the device-side team link so the player shows up
-                // in the right roster after the next pull.
-                apiService.createCustomPlayer(authHeader, request).isSuccessful
+                
+                if (tournamentId != "0" && tournamentId.isNotBlank()) {
+                    val body = com.devwithguru.cricket.data.api.CreatePlayerRequest(
+                        name = name,
+                        role = role,
+                        team_id = teamIdStr?.toIntOrNull()
+                    )
+                    apiService.createTournamentPlayer(authHeader, tournamentId, body).isSuccessful
+                } else {
+                    apiService.createCustomPlayer(authHeader, request).isSuccessful
+                }
             }
             "approve" -> {
                 val playerId = payload["playerId"] as? String ?: return false
@@ -306,12 +328,24 @@ class SyncManager @Inject constructor(
         val tournamentId = payload["tournamentId"] as? String ?: ""
         return when (change.action) {
             "create" -> {
+                var homeTeamIdStr = payload["homeTeamId"] as? String
+                if (homeTeamIdStr != null && homeTeamIdStr.all { it.isDigit() }) {
+                    val serverId = adminTeamDao.findById(homeTeamIdStr)?.serverId
+                    if (serverId != null) homeTeamIdStr = serverId.toString()
+                }
+                
+                var awayTeamIdStr = payload["awayTeamId"] as? String
+                if (awayTeamIdStr != null && awayTeamIdStr.all { it.isDigit() }) {
+                    val serverId = adminTeamDao.findById(awayTeamIdStr)?.serverId
+                    if (serverId != null) awayTeamIdStr = serverId.toString()
+                }
+
                 val body = com.devwithguru.cricket.data.api.CreateFixtureRequest(
                     round_number = (payload["roundNumber"] as? Number)?.toInt() ?: 1,
                     round_name = payload["roundName"] as? String ?: "",
                     match_number = (payload["matchNumber"] as? Number)?.toInt() ?: 1,
-                    home_team_id = (payload["homeTeamId"] as? String)?.toIntOrNull() ?: 0,
-                    away_team_id = (payload["awayTeamId"] as? String)?.toIntOrNull() ?: 0,
+                    home_team_id = homeTeamIdStr?.toIntOrNull() ?: 0,
+                    away_team_id = awayTeamIdStr?.toIntOrNull() ?: 0,
                     home_team_name = payload["homeTeamName"] as? String,
                     away_team_name = payload["awayTeamName"] as? String,
                     scheduled_at = normalizeScheduledAt(

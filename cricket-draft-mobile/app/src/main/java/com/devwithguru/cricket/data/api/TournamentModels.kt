@@ -493,3 +493,10 @@ data class StandingsSimulationData(
     val simulations: List<Any>?,
     val qualification_scenarios: List<Any>?
 )
+
+
+data class CreatePlayerRequest(
+    val name: String,
+    val role: String?,
+    val team_id: Int? = null
+)

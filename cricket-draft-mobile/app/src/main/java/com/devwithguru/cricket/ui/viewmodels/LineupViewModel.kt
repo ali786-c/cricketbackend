@@ -78,8 +78,8 @@ class LineupViewModel @Inject constructor(
                 ?.takeIf { it.isNotBlank() && it != "0" }
                 ?.let { tournamentRepository.getTournamentById(it) }
 
-            _squadSize.value = tournament?.squadSize
-                ?: scheduledFixture?.wickets?.plus(1)
+            _squadSize.value = scheduledFixture?.wickets?.plus(1)
+                ?: tournament?.squadSize
                 ?: 11
 
             // Resolve BOTH team IDs before loading squads. Custom-match fixtures
