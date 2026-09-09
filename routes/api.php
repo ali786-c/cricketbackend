@@ -114,6 +114,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('admin/tournaments/{tournament}/matches', [AdminMatchController::class, 'store'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.store');
         Route::get('admin/tournaments/{tournament}/matches/{match}', [AdminMatchController::class, 'show'])->middleware('permission:manage tournaments')->name('api.v1.admin.matches.show');
         Route::patch('admin/tournaments/{tournament}/matches/{match}/overs', [AdminMatchController::class, 'updateOvers'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.overs');
+        // Custom Match API route workarounds
+        Route::post('admin/tournaments/0/matches/{match}/teams/{team}/playing-xi', [AdminMatchController::class, 'customPlayingXi'])->name('api.v1.admin.custom-matches.playing-xi');
+        Route::post('admin/tournaments/0/matches/{match}/approve-lineup', [AdminMatchController::class, 'customApproveLineup'])->name('api.v1.admin.custom-matches.approve-lineup');
+        Route::post('admin/tournaments/0/matches/{match}/toss', [AdminMatchController::class, 'customToss'])->name('api.v1.admin.custom-matches.toss');
+
         Route::post('admin/tournaments/{tournament}/matches/{match}/teams/{team}/playing-xi', [AdminMatchController::class, 'playingXi'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.playing-xi');
         Route::post('admin/tournaments/{tournament}/matches/{match}/approve-lineup', [AdminMatchController::class, 'approveLineup'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.approve-lineup');
         Route::post('admin/tournaments/{tournament}/matches/{match}/toss', [AdminMatchController::class, 'toss'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.toss');

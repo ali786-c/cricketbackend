@@ -41,9 +41,8 @@ class AdminMatchController extends Controller
         return response()->json(['data' => $this->matches->updateOversPerInnings($match, (int) $data['overs_per_innings'], (int) $request->user()->id), 'message' => 'Match overs updated successfully.']);
     }
 
-    public function playingXi(Request $request, Tournament $tournament, CricketMatch $match, int $team): JsonResponse
+    public function customPlayingXi(Request $request, CricketMatch $match, int $team): JsonResponse
     {
-        $this->belongs($tournament, $match, $request);
         $data = $request->validate([
             'player_ids' => ['required', 'array'], 
             'player_ids.*' => ['integer'],
@@ -69,17 +68,33 @@ class AdminMatchController extends Controller
         return response()->json(['data' => $this->matches->submitPlayingXi($match, $team, $playerIds, (int) $request->user()->id)]);
     }
 
+    public function playingXi(Request $request, Tournament $tournament, CricketMatch $match, int $team): JsonResponse
+    {
+        $this->belongs($tournament, $match, $request);
+        return $this->customPlayingXi($request, $match, $team);
+    }
+
+    public function customApproveLineup(Request $request, CricketMatch $match): JsonResponse
+    {
+        return response()->json(['data' => $this->matches->approveLineup($match, (int) $request->user()->id)]);
+    }
+
     public function approveLineup(Request $request, Tournament $tournament, CricketMatch $match): JsonResponse
     {
         $this->belongs($tournament, $match, $request);
-        return response()->json(['data' => $this->matches->approveLineup($match, (int) $request->user()->id)]);
+        return $this->customApproveLineup($request, $match);
+    }
+
+    public function customToss(Request $request, CricketMatch $match): JsonResponse
+    {
+        $data = $request->validate(['toss_winner_team_id' => ['required', 'integer'], 'toss_decision' => ['required', 'in:bat,field']]);
+        return response()->json(['data' => $this->matches->recordToss($match, (int) $data['toss_winner_team_id'], $data['toss_decision'], (int) $request->user()->id)]);
     }
 
     public function toss(Request $request, Tournament $tournament, CricketMatch $match): JsonResponse
     {
         $this->belongs($tournament, $match, $request);
-        $data = $request->validate(['toss_winner_team_id' => ['required', 'integer'], 'toss_decision' => ['required', 'in:bat,field']]);
-        return response()->json(['data' => $this->matches->recordToss($match, (int) $data['toss_winner_team_id'], $data['toss_decision'], (int) $request->user()->id)]);
+        return $this->customToss($request, $match);
     }
 
     private function belongs(Tournament $tournament, CricketMatch $match, Request $request): void
