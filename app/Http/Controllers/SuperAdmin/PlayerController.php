@@ -16,6 +16,7 @@ class PlayerController extends Controller
         if ($search = trim((string) $request->string('search'))) {
             $query->where(function ($builder) use ($search) {
                 $builder->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('unique_code', 'like', "%{$search}%")
                     ->orWhereHas('user', function ($q) use ($search) {
                         $q->where('email', 'like', "%{$search}%");
                     });

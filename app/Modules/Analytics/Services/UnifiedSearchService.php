@@ -84,7 +84,7 @@ class UnifiedSearchService
         $code = strtoupper(trim($code));
 
         // Check player
-        if (str_starts_with($code, 'PLR-')) {
+        if (preg_match('/^\d{6}$/', $code) || str_starts_with($code, 'PLR-')) {
             $player = PlayerProfile::where('unique_code', $code)->with('user')->first();
             if ($player) {
                 return [
@@ -114,7 +114,7 @@ class UnifiedSearchService
     {
         $q = PlayerProfile::query()->where('is_active', true);
 
-        if ($isCode && str_starts_with(strtoupper($query), 'PLR-')) {
+        if ($isCode && (preg_match('/^\d{6}$/', $query) || str_starts_with(strtoupper($query), 'PLR-'))) {
             $q->where('unique_code', strtoupper($query));
         } else {
             $q->where(function ($sub) use ($query) {
@@ -272,7 +272,7 @@ class UnifiedSearchService
     private function isUniqueCode(string $query): bool
     {
         $upper = strtoupper(trim($query));
-        return preg_match('/^(TEAM-[A-Z0-9]{5}|PLR-[A-Z0-9]{5})$/', $upper) === 1;
+        return preg_match('/^(\d{6}|TEAM-[A-Z0-9]{5}|PLR-[A-Z0-9]{5})$/', $upper) === 1;
     }
 
     private function emptyResult(): array
