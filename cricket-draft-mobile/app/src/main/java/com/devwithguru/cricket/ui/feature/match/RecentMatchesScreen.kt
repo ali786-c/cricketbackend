@@ -39,11 +39,14 @@ fun RecentMatchesScreen(
 ) {
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
     val fixtures by viewModel.fixtures.collectAsState()
+    val tournamentContexts by viewModel.tournamentContexts.collectAsState()
     
     val matchesList = fixtures.map { f ->
+        val tournament = tournamentContexts[f.id]
         PremiumMatchData(
             id = f.id,
-            tournamentName = "${f.homeTeam} vs ${f.awayTeam}",
+            tournamentId = tournament?.id,
+            tournamentName = tournament?.name,
             stageInfo = "${f.matchType}, ${f.ballType}, ${f.date}",
             teamA = f.homeTeam,
             teamB = f.awayTeam,
@@ -98,7 +101,9 @@ fun RecentMatchesScreen(
                     scoreB = match.scoreB,
                     isLive = match.isLive,
                     onClick = { onNavigateToMatchCenter(match.id) },
-                    onViewTournamentClick = { onNavigateToTournamentHub("corporate-cup") }
+                    onViewTournamentClick = match.tournamentId?.let { tournamentId ->
+                        { onNavigateToTournamentHub(tournamentId) }
+                    }
                 )
             }
         }
@@ -107,6 +112,7 @@ fun RecentMatchesScreen(
 
 data class PremiumMatchData(
     val id: String,
+    val tournamentId: String?,
     val tournamentName: String?,
     val stageInfo: String,
     val teamA: String,
@@ -127,7 +133,7 @@ fun PremiumMatchCard(
     isLive: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onViewTournamentClick: () -> Unit
+    onViewTournamentClick: (() -> Unit)?
 ) {
     Card(
         modifier = modifier
@@ -270,7 +276,7 @@ fun PremiumMatchCard(
                 )
             }
 
-            if (!tournamentName.isNullOrBlank()) {
+            if (!tournamentName.isNullOrBlank() && onViewTournamentClick != null) {
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Tournament footer
@@ -291,7 +297,7 @@ fun PremiumMatchCard(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = (-0.2).sp,
-                    modifier = Modifier.clickable { onViewTournamentClick() }
+                    modifier = Modifier.clickable(onClick = onViewTournamentClick)
                 )
             }
         }

@@ -54,6 +54,38 @@ class MatchCenterViewModel @Inject constructor(
             _isLive.value = localFixture?.status == "Live"
             _isLoading.value = false
 
+            // Self-heal matches started by older builds where local scoring went
+            // live but the backend lifecycle request failed.
+            val adminFixture = localFixture?.let { fixtureRepository.getAdminFixtureById(it.id) }
+            val isCustom = adminFixture?.tournamentId.isNullOrBlank() ||
+                adminFixture?.tournamentId == "0" || adminFixture?.tournamentId == "custom"
+            val canRepairStart = localFixture?.status.equals("Live", ignoreCase = true) &&
+                isCustom && localFixture?.playerServerIds.isNullOrEmpty() &&
+                !localFixture?.homeSquad.isNullOrEmpty() && !localFixture?.awaySquad.isNullOrEmpty() &&
+                !localFixture?.tossWinner.isNullOrBlank() && !localFixture?.tossDecision.isNullOrBlank()
+            if (canRepairStart && localFixture != null) {
+                syncManager.queueChange(
+                    "match_start", localFixture.id, "start",
+                    mapOf(
+                        "homeLineup" to localFixture.homeSquad,
+                        "awayLineup" to localFixture.awaySquad,
+                        "tossWinner" to localFixture.tossWinner,
+                        "tossDecision" to localFixture.tossDecision
+                    )
+                )
+                val repaired = fixtureRepository.startCustomOperationalMatch(
+                    localFixture.id, localFixture.homeSquad, localFixture.awaySquad,
+                    localFixture.tossWinner, localFixture.tossDecision
+                )
+                if (repaired.isSuccess) {
+                    fixtureRepository.getScheduledFixtureById(matchId)?.let { _fixture.value = it }
+                    // The start response gives pending deliveries their server-side
+                    // player/innings identities. Flush them now so an older locally
+                    // scored match becomes complete in Super Admin immediately.
+                    syncManager.pushPendingChanges()
+                }
+            }
+
             // Step 1: Pre-sync — push local data first, then pull server data
             // Step 2: Load from Room (now has fresh server data)
             try {

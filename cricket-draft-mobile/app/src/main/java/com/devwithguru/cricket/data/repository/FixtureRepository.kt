@@ -193,7 +193,7 @@ class FixtureRepository @Inject constructor(
         }
     }
 
-    /** 
+    /**
      * Create an operational match from a fixture � server-side match creation
      */
     suspend fun createMatchFromFixture(
@@ -260,13 +260,13 @@ class FixtureRepository @Inject constructor(
     suspend fun resolveOriginalFixtureId(fixtureIdStr: String): String {
         val admin = adminFixtureDao.findById(fixtureIdStr)
         if (admin != null) return admin.id
-        
+
         val allAdmin = adminFixtureDao.getAllAdminFixtures()
         val matchAdmin = allAdmin.find {
             it.id.hashCode().toString() == fixtureIdStr
         }
         if (matchAdmin != null) return matchAdmin.id
-        
+
         return fixtureIdStr
     }
 
@@ -465,7 +465,7 @@ class FixtureRepository @Inject constructor(
                     overs_per_innings = local.overs,
                     playing_xi_size = local.wickets + 1,
                     maximum_wickets = local.wickets,
-                    legal_balls_per_over = fixture.ballsPerOver,
+                    legal_balls_per_over = local.ballsPerOver,
                     max_overs_per_bowler = maxOf(1, (local.overs + 4) / 5),
                     ball_type = when (local.ballType.trim().lowercase().replace(" ", "_")) {
                         "leather", "tennis", "hard_ball", "tape_ball", "indoor" -> local.ballType.trim().lowercase().replace(" ", "_")
@@ -524,6 +524,11 @@ class FixtureRepository @Inject constructor(
         val fixture = getScheduledFixtureById(fixtureId) ?: return Result.failure(IllegalStateException("Local match is missing"))
         val token = authRepository.getRawToken() ?: return Result.failure(IllegalStateException("Authentication is required"))
         val winnerSide = if (tossWinnerName.equals(fixture.homeTeam, ignoreCase = true)) "home" else "away"
+        val normalizedDecision = when (tossDecision.trim().lowercase()) {
+            "bat", "batting" -> "bat"
+            "bowl", "bowling", "field", "fielding" -> "field"
+            else -> return Result.failure(IllegalArgumentException("Choose whether the toss winner will bat or field"))
+        }
         return try {
             val response = apiService.startCustomMatch(
                 "Bearer $token",
@@ -532,7 +537,7 @@ class FixtureRepository @Inject constructor(
                     home_lineup = homeLineup.map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
                     away_lineup = awayLineup.map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
                     toss_winner = winnerSide,
-                    toss_decision = tossDecision.lowercase()
+                    toss_decision = normalizedDecision
                 )
             )
             val data = response.body()?.data
@@ -574,10 +579,10 @@ class FixtureRepository @Inject constructor(
 
     suspend fun updateFixture(fixture: com.devwithguru.cricket.domain.model.ScheduledFixture) {
         saveFixture(fixture)
-        
+
         val existingAdmin = adminFixtureDao.findById(fixture.id)
         val tournamentId = existingAdmin?.tournamentId ?: extractTournamentId(fixture.id)
-        
+
         // Auto-advance tournament status based on match updates
         if (tournamentId.isNotBlank()) {
             val statusLower = fixture.status.lowercase()

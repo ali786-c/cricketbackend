@@ -135,6 +135,23 @@ class MainViewModel @Inject constructor(
                 _currentFixture.value = f
             }
 
+            val adminFixture = fixture?.let { fixtureRepository.getAdminFixtureById(it.id) }
+            val customMatch = adminFixture?.tournamentId.isNullOrBlank() ||
+                adminFixture?.tournamentId == "0" || adminFixture?.tournamentId == "custom"
+            if (fixture != null && customMatch) {
+                // Durable lifecycle command: a failed/slow direct request must not
+                // leave the backend permanently at squad_selection.
+                syncManager.queueChange(
+                    "match_start", fixture.id, "start",
+                    mapOf(
+                        "homeLineup" to homeSquad,
+                        "awayLineup" to awaySquad,
+                        "tossWinner" to tossWinner,
+                        "tossDecision" to tossDecision
+                    )
+                )
+            }
+
             // Local persistence is enough to enter scoring. Slow/offline network
             // work below cannot block navigation or ball input.
             _isPreSyncing.value = false
@@ -143,7 +160,6 @@ class MainViewModel @Inject constructor(
 
             // Step 4: Queue the Live status for server sync
             if (fixture != null) {
-                val adminFixture = fixtureRepository.getAdminFixtureById(fixture.id)
                 val tournamentId = adminFixture?.tournamentId ?: ""
 
                 // Step 4a: ensure the backend has the fixture itself (covers
@@ -152,7 +168,6 @@ class MainViewModel @Inject constructor(
 
                 // Step 4b: create the operational match server-side so the game
                 // appears in the SuperAdmin Matches tab immediately
-                val customMatch = adminFixture?.tournamentId.isNullOrBlank() || adminFixture?.tournamentId == "0" || adminFixture?.tournamentId == "custom"
                 if (customMatch) {
                     val started = fixtureRepository.startCustomOperationalMatch(
                         fixture.id, homeSquad, awaySquad, tossWinner, tossDecision
@@ -160,6 +175,11 @@ class MainViewModel @Inject constructor(
                     if (started.isFailure && syncManager.isOnline()) {
                         _lifecycleError.value = started.exceptionOrNull()?.message ?: "Unable to start match"
                         return@launch
+                    }
+                    if (started.isSuccess) {
+                        // Player and innings IDs now exist remotely; immediately
+                        // drain anything recorded while the start request ran.
+                        syncManager.pushPendingChanges()
                     }
                 } else {
                     val created = fixtureRepository.createOperationalMatchIfNeeded(fixture.id)

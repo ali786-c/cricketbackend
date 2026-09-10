@@ -64,7 +64,7 @@ import com.devwithguru.cricket.data.db.dao.PlayerStatsDao
         UserProfileEntity::class,
         PlayerStatsEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

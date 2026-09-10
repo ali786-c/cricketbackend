@@ -57,7 +57,19 @@ class MatchApiRepository @Inject constructor(
                             awayTeam = finalAway,
                             venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
                             date = if (fixture.date.isBlank()) cached.date else fixture.date,
-                            time = if (fixture.time.isBlank()) cached.time else fixture.time
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time,
+                            status = if (cached.status == "Live" && fixture.status == "Scheduled") cached.status else fixture.status,
+                            tossWinner = fixture.tossWinner.ifBlank { cached.tossWinner },
+                            tossDecision = fixture.tossDecision.ifBlank { cached.tossDecision },
+                            homeSquad = fixture.homeSquad.ifEmpty { cached.homeSquad },
+                            awaySquad = fixture.awaySquad.ifEmpty { cached.awaySquad },
+                            currentRuns = if (body.data.innings.isEmpty()) cached.currentRuns else fixture.currentRuns,
+                            currentWickets = if (body.data.innings.isEmpty()) cached.currentWickets else fixture.currentWickets,
+                            oversBowled = if (body.data.innings.isEmpty()) cached.oversBowled else fixture.oversBowled,
+                            strikerName = fixture.strikerName.ifBlank { cached.strikerName },
+                            nonStrikerName = fixture.nonStrikerName.ifBlank { cached.nonStrikerName },
+                            bowlerName = fixture.bowlerName.ifBlank { cached.bowlerName },
+                            playerServerIds = fixture.playerServerIds.ifEmpty { cached.playerServerIds }
                         )
                     }
 
@@ -107,7 +119,19 @@ class MatchApiRepository @Inject constructor(
                             awayTeam = finalAway,
                             venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
                             date = if (fixture.date.isBlank()) cached.date else fixture.date,
-                            time = if (fixture.time.isBlank()) cached.time else fixture.time
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time,
+                            status = if (cached.status == "Live" && fixture.status == "Scheduled") cached.status else fixture.status,
+                            tossWinner = fixture.tossWinner.ifBlank { cached.tossWinner },
+                            tossDecision = fixture.tossDecision.ifBlank { cached.tossDecision },
+                            homeSquad = fixture.homeSquad.ifEmpty { cached.homeSquad },
+                            awaySquad = fixture.awaySquad.ifEmpty { cached.awaySquad },
+                            currentRuns = if (body.data.innings.isEmpty()) cached.currentRuns else fixture.currentRuns,
+                            currentWickets = if (body.data.innings.isEmpty()) cached.currentWickets else fixture.currentWickets,
+                            oversBowled = if (body.data.innings.isEmpty()) cached.oversBowled else fixture.oversBowled,
+                            strikerName = fixture.strikerName.ifBlank { cached.strikerName },
+                            nonStrikerName = fixture.nonStrikerName.ifBlank { cached.nonStrikerName },
+                            bowlerName = fixture.bowlerName.ifBlank { cached.bowlerName },
+                            playerServerIds = fixture.playerServerIds.ifEmpty { cached.playerServerIds }
                         )
                     }
 

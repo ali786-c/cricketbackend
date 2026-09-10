@@ -6,6 +6,7 @@ import com.devwithguru.cricket.data.db.dao.AdminFixtureDao
 import com.devwithguru.cricket.data.db.dao.PendingChangeDao
 import com.devwithguru.cricket.data.db.dao.SyncStatusDao
 import com.devwithguru.cricket.data.db.dao.TeamDao
+import com.devwithguru.cricket.data.db.dao.FixtureDao
 import com.devwithguru.cricket.data.db.dao.TournamentDao
 import com.devwithguru.cricket.data.db.entity.PendingChangeEntity
 import com.devwithguru.cricket.data.db.entity.SyncStatusEntity
@@ -48,6 +49,7 @@ class SyncManager @Inject constructor(
     private val pendingChangeDao: PendingChangeDao,
     private val tournamentDao: TournamentDao,
     private val teamDao: TeamDao,
+    private val fixtureDao: FixtureDao,
     private val adminFixtureDao: AdminFixtureDao,
     private val adminTeamDao: com.devwithguru.cricket.data.db.dao.AdminTeamDao,
     private val adminPlayerDao: com.devwithguru.cricket.data.db.dao.AdminPlayerDao,
@@ -148,7 +150,8 @@ class SyncManager @Inject constructor(
             failCount += deliveryFail
 
             pendingChangeDao.deleteCompletedChanges()
-            pendingChangeDao.deleteFailedChanges(maxRetries = 5)
+            // Failed lifecycle/scoring work is evidence, not disposable cache.
+            // Keep it retryable/visible until acknowledged or manually resolved.
             _lastSyncTime.value = System.currentTimeMillis()
             updatePendingCount()
             _syncStatus.value = if (failCount == 0) SyncStatus.IDLE else SyncStatus.PARTIAL
@@ -195,9 +198,61 @@ class SyncManager @Inject constructor(
                 "tournament_status" -> pushTournamentStatusChange(payload, authHeader)
                 "captain" -> pushCaptainChange(payload, authHeader)
                 "delivery" -> true // handled by DeliverySyncRepository
+                "match_start" -> pushMatchStart(change, payload, authHeader)
                 else -> true
             }
         } catch (e: Exception) { false }
+    }
+
+    private suspend fun pushMatchStart(
+        change: PendingChangeEntity,
+        payload: Map<*, *>,
+        authHeader: String
+    ): Boolean {
+        val adminFixture = adminFixtureDao.findById(change.entityId) ?: return false
+        val serverFixtureId = adminFixture.serverId ?: return false
+        var serverMatchId = adminFixture.serverMatchId
+
+        if (serverMatchId == null) {
+            val created = apiService.createCustomMatch(authHeader, serverFixtureId.toString())
+            val data = created.body()?.data
+            if (!created.isSuccessful || data == null) return false
+            serverMatchId = data.match_id
+            adminFixtureDao.updateOperationalMatch(change.entityId, data.match_id, data.revision, data.status ?: "squad_selection")
+        }
+
+        fun names(key: String): List<String> = (payload[key] as? List<*>)
+            ?.mapNotNull { it as? String }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+        val fixture = fixtureDao.findById(change.entityId) ?: return false
+        val winnerSide = if ((payload["tossWinner"] as? String).equals(fixture.homeTeam, ignoreCase = true)) "home" else "away"
+        val decision = when ((payload["tossDecision"] as? String)?.trim()?.lowercase()) {
+            "bat", "batting" -> "bat"
+            "bowl", "bowling", "field", "fielding" -> "field"
+            else -> return false
+        }
+        val response = apiService.startCustomMatch(
+            authHeader,
+            serverMatchId.toString(),
+            com.devwithguru.cricket.data.api.StartCustomMatchRequest(
+                home_lineup = names("homeLineup").map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
+                away_lineup = names("awayLineup").map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
+                toss_winner = winnerSide,
+                toss_decision = decision
+            )
+        )
+        val started = response.body()?.data
+        if (!response.isSuccessful || started == null) return false
+        adminFixtureDao.updateOperationalMatch(change.entityId, started.match_id, started.revision, started.status)
+        fixtureDao.insertFixture(
+            fixture.copy(
+                status = "Live",
+                playerServerIds = gson.toJson(started.players.associate { it.name to it.match_player_id })
+            )
+        )
+        return true
     }
 
     /**

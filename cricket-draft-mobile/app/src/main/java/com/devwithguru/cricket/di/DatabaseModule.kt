@@ -32,7 +32,6 @@ object DatabaseModule {
             db.execSQL("ALTER TABLE admin_fixtures ADD COLUMN serverRevision INTEGER")
             db.execSQL("ALTER TABLE admin_fixtures ADD COLUMN syncError TEXT")
             db.execSQL("ALTER TABLE fixtures ADD COLUMN playerServerIds TEXT NOT NULL DEFAULT '{}'")
-            db.execSQL("ALTER TABLE fixtures ADD COLUMN ballsPerOver INTEGER NOT NULL DEFAULT 6")
             db.execSQL("ALTER TABLE pending_deliveries ADD COLUMN strikerName TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE pending_deliveries ADD COLUMN nonStrikerName TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE pending_deliveries ADD COLUMN bowlerName TEXT NOT NULL DEFAULT ''")
@@ -40,6 +39,34 @@ object DatabaseModule {
             db.execSQL("ALTER TABLE pending_deliveries ADD COLUMN wicketFielderName TEXT")
         }
     }
+
+    /**
+     * Version 17 shipped without ballsPerOver. Keep this separate from 16→17:
+     * changing an already released migration leaves existing v17 databases with
+     * a stale Room identity hash and crashes the app during startup.
+     */
+    private val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Some development APKs used schema 17 with this column but without
+            // changing Room's version. Support both v17 shapes safely.
+            if (!db.hasColumn("fixtures", "ballsPerOver")) {
+                db.execSQL("ALTER TABLE fixtures ADD COLUMN ballsPerOver INTEGER NOT NULL DEFAULT 6")
+            }
+        }
+    }
+
+    private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
+        query("PRAGMA table_info(`$table`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(nameIndex) == column) {
+                    found = true
+                    break
+                }
+            }
+            found
+        }
 
     @Provides
     @Singleton
@@ -49,7 +76,7 @@ object DatabaseModule {
             CricketDatabase::class.java,
             "cricket.db"
         )
-            .addMigrations(MIGRATION_16_17)
+            .addMigrations(MIGRATION_16_17, MIGRATION_17_18)
             .build()
     }
 
