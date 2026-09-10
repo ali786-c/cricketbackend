@@ -15,9 +15,11 @@ class CricketMatch extends Model
 
     protected $fillable = [
         'fixture_id',
+        'client_uuid',
         'tournament_id',
         'rule_profile_id',
         'rule_profile_version',
+        'rule_snapshot',
         'overs_per_innings',
         'status',
         'toss_winner_team_id',
@@ -43,6 +45,7 @@ class CricketMatch extends Model
     {
         return [
             'overs_per_innings' => 'integer',
+            'rule_snapshot' => 'array',
             'toss_recorded_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',

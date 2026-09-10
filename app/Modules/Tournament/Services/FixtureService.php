@@ -45,6 +45,8 @@ class FixtureService
                 'timezone' => $data['timezone'] ?? $tournament?->timezone ?: 'UTC',
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? null,
+                'client_uuid' => $data['client_uuid'] ?? null,
+                'configuration_snapshot' => $data['configuration'] ?? null,
                 'created_by' => $actorId,
                 'updated_by' => $actorId,
             ]);
@@ -79,6 +81,7 @@ class FixtureService
                 'city' => $data['city'] ?? null,
                 'timezone' => $data['timezone'] ?? $tournament?->timezone ?: 'UTC',
                 'notes' => $data['notes'] ?? null,
+                'configuration_snapshot' => $data['configuration'] ?? $fixture->configuration_snapshot,
                 'updated_by' => $actorId,
             ]);
             return $fixture->fresh(['homeTeam', 'awayTeam']);
@@ -105,9 +108,19 @@ class FixtureService
     public function createMatch(Fixture $fixture, int $actorId)
     {
         $fixture->load(['tournament', 'homeTeam', 'awayTeam']);
+        $existingMatch = $fixture->match()->first();
+        if ($existingMatch) return $existingMatch->load(['players.team', 'ruleProfile', 'fixture']);
         if (! in_array($fixture->status, ['scheduled', 'postponed'], true)) $this->fail('fixture', 'A match can only be created from a scheduled or postponed fixture.');
-        if ($fixture->match()->exists()) $this->fail('fixture', 'This fixture already has an operational match.');
-        $match = $this->matchService->createFromTeams($fixture->tournament, $fixture->home_team_id, $fixture->away_team_id, $fixture->id, $actorId);
+        $match = $this->matchService->createFromTeams(
+            $fixture->tournament,
+            $fixture->home_team_id,
+            $fixture->away_team_id,
+            $fixture->id,
+            $actorId,
+            null,
+            $fixture->configuration_snapshot,
+            $fixture->client_uuid,
+        );
         $fixture->update(['status' => 'in_progress', 'updated_by' => $actorId]);
         return $match;
     }
@@ -116,7 +129,7 @@ class FixtureService
     {
         if ($homeId === $awayId) $this->fail('teams', 'A fixture requires two different teams.');
         if ($tournament) {
-            $teams = $tournament->teams()->whereIn('id', [$homeId, $awayId])->where('is_active', true)->get()->keyBy('id');
+            $teams = $tournament->teams()->whereIn('teams.id', [$homeId, $awayId])->where('teams.is_active', true)->get()->keyBy('id');
             if ($teams->count() !== 2) $this->fail('teams', 'Both fixture teams must be active teams in this tournament.');
             return [$teams->get($homeId), $teams->get($awayId)];
         } else {

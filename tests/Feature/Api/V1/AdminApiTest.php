@@ -58,8 +58,9 @@ class AdminApiTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         $player = User::factory()->create();
-        $profile = PlayerProfile::create(['user_id' => $player->id, 'full_name' => 'API Registration Player', 'playing_role' => 'Batter']);
-        $tournament = Tournament::create(['name' => 'Approval API Cup', 'slug' => 'approval-api-cup', 'status' => 'registration', 'is_public' => true, 'timezone' => 'Asia/Karachi']);
+        $player->playerProfile()->update(['full_name' => 'API Registration Player', 'playing_role' => 'Batter']);
+        $profile = $player->playerProfile()->firstOrFail();
+        $tournament = Tournament::create(['name' => 'Approval API Cup', 'slug' => 'approval-api-cup', 'status' => 'registration', 'is_public' => true, 'timezone' => 'Asia/Karachi', 'creator_id' => $admin->id]);
         $registration = TournamentPlayer::create(['tournament_id' => $tournament->id, 'player_profile_id' => $profile->id, 'status' => 'pending']);
         $headers = ['Authorization' => 'Bearer '.$admin->createToken('admin-mobile')->plainTextToken];
 
@@ -87,7 +88,7 @@ class AdminApiTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         $profile = CricketRuleProfile::query()->where('slug', 't20-standard')->firstOrFail();
-        $tournament = Tournament::create(['name' => 'Match Overs API Cup', 'slug' => 'match-overs-api-cup', 'status' => 'ready', 'is_public' => true, 'timezone' => 'Asia/Karachi', 'cricket_rule_profile_id' => $profile->id]);
+        $tournament = Tournament::create(['name' => 'Match Overs API Cup', 'slug' => 'match-overs-api-cup', 'status' => 'ready', 'is_public' => true, 'timezone' => 'Asia/Karachi', 'cricket_rule_profile_id' => $profile->id, 'creator_id' => $admin->id]);
         $match = CricketMatch::create(['tournament_id' => $tournament->id, 'rule_profile_id' => $profile->id, 'rule_profile_version' => $profile->version, 'overs_per_innings' => 20, 'status' => 'squad_selection', 'revision' => 1, 'created_by' => $admin->id]);
         $headers = ['Authorization' => 'Bearer '.$admin->createToken('admin-match-overs')->plainTextToken];
 
@@ -129,8 +130,9 @@ class AdminApiTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = Tournament::create(['name' => 'Draft Admin API Cup', 'slug' => 'draft-admin-api-cup', 'status' => 'ready', 'is_public' => true, 'timezone' => 'Asia/Karachi']);
+        $tournament = Tournament::create(['name' => 'Draft Admin API Cup', 'slug' => 'draft-admin-api-cup', 'status' => 'ready', 'is_public' => true, 'timezone' => 'Asia/Karachi', 'has_draft' => true, 'creator_id' => $admin->id]);
         $team = Team::create(['tournament_id' => $tournament->id, 'name' => 'API Team', 'short_name' => 'API', 'is_active' => true, 'display_order' => 1]);
+        $tournament->teams()->attach($team->id);
         $draft = Draft::create(['tournament_id' => $tournament->id, 'status' => 'setup', 'revision' => 1]);
         $round = DraftRound::create(['draft_id' => $draft->id, 'round_number' => 1, 'name' => 'Round 1', 'status' => 'pending']);
         DraftPick::create(['draft_id' => $draft->id, 'draft_round_id' => $round->id, 'team_id' => $team->id, 'pick_number' => 1, 'pick_duration' => 30, 'status' => 'pending']);

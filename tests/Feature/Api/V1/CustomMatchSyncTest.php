@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1;
 use App\Models\CricketMatch;
 use App\Models\PlayerProfile;
 use App\Models\Fixture;
+use App\Models\MatchInnings;
 use App\Models\Team;
 use App\Models\User;
 use Database\Seeders\CricketRuleProfileSeeder;
@@ -27,7 +28,7 @@ class CustomMatchSyncTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole($role);
-        $token = $user->createToken('android-test')->accessToken;
+        $token = $user->createToken('android-test')->plainTextToken;
 
         return [$user, $token];
     }
@@ -135,10 +136,165 @@ class CustomMatchSyncTest extends TestCase
         $this->assertDatabaseHas('matches', ['id' => $matchId, 'fixture_id' => $fixtureId]);
         $this->assertNull(CricketMatch::find($matchId)->tournament_id);
 
-        // Duplicate creation is rejected (idempotent safety)
-        $this->postJson("/api/v1/custom/fixtures/{$fixtureId}/create-match", [], [
+        // Duplicate creation returns the original match (idempotent retry safety).
+        $duplicate = $this->postJson("/api/v1/custom/fixtures/{$fixtureId}/create-match", [], [
             'Authorization' => 'Bearer '.$token,
-        ])->assertStatus(422);
+        ])->assertCreated();
+        $this->assertSame($matchId, $duplicate->json('data.match_id'));
+        $this->assertSame(1, CricketMatch::query()->where('fixture_id', $fixtureId)->count());
+    }
+
+    public function test_custom_configuration_is_snapshotted_on_operational_match(): void
+    {
+        [, $token] = $this->authenticatedUser();
+        $clientUuid = '5ca1ab1e-8baf-4f79-9637-914898a88490';
+
+        $payload = [
+            'home_team_id' => 0,
+            'away_team_id' => 0,
+            'home_team_name' => 'Sixes Home',
+            'away_team_name' => 'Sixes Away',
+            'scheduled_at' => '2026-09-12T16:00:00.000000Z',
+            'client_uuid' => $clientUuid,
+            'configuration' => [
+                'format' => 'custom',
+                'innings_per_side' => 1,
+                'overs_per_innings' => 6,
+                'playing_xi_size' => 6,
+                'maximum_wickets' => 5,
+                'legal_balls_per_over' => 6,
+                'max_overs_per_bowler' => 2,
+                'ball_type' => 'tennis',
+                'no_ball_runs' => 1,
+                'wide_runs' => 1,
+            ],
+        ];
+
+        $fixtureResponse = $this->postJson('/api/v1/custom/fixtures', $payload, [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertCreated();
+        $fixtureId = $fixtureResponse->json('data.id');
+
+        // Retrying fixture creation with the same client UUID returns the same row.
+        $retriedFixture = $this->postJson('/api/v1/custom/fixtures', $payload, [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk();
+        $this->assertSame($fixtureId, $retriedFixture->json('data.id'));
+        $this->assertSame(1, Fixture::query()->where('client_uuid', $clientUuid)->count());
+
+        $matchResponse = $this->postJson("/api/v1/custom/fixtures/{$fixtureId}/create-match", [], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertCreated();
+        $match = CricketMatch::query()->findOrFail($matchResponse->json('data.match_id'));
+
+        $this->assertSame($clientUuid, $match->client_uuid);
+        $this->assertSame(6, $match->overs_per_innings);
+        $this->assertSame('custom', $match->rule_snapshot['format']);
+        $this->assertSame(6, $match->rule_snapshot['playing_xi_size']);
+        $this->assertSame(5, $match->rule_snapshot['maximum_wickets']);
+        $this->assertSame('tennis', $match->rule_snapshot['ball_type']);
+
+        // The match keeps its immutable snapshot even if the profile changes later.
+        $match->ruleProfile->update(['maximum_wickets' => 4]);
+        $this->assertSame(5, $match->fresh()->rule_snapshot['maximum_wickets']);
+    }
+
+    public function test_custom_configuration_rejects_wickets_not_below_playing_xi(): void
+    {
+        [, $token] = $this->authenticatedUser();
+
+        $this->postJson('/api/v1/custom/fixtures', [
+            'home_team_id' => 0,
+            'away_team_id' => 0,
+            'home_team_name' => 'Invalid Home',
+            'away_team_name' => 'Invalid Away',
+            'scheduled_at' => '2026-09-12T16:00:00.000000Z',
+            'configuration' => [
+                'format' => 'custom',
+                'innings_per_side' => 1,
+                'overs_per_innings' => 6,
+                'playing_xi_size' => 5,
+                'maximum_wickets' => 5,
+                'legal_balls_per_over' => 6,
+                'ball_type' => 'tennis',
+            ],
+        ], ['Authorization' => 'Bearer '.$token])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('configuration.maximum_wickets');
+    }
+
+    public function test_another_admin_cannot_manage_or_read_someone_elses_custom_match(): void
+    {
+        [$owner, $ownerToken] = $this->authenticatedUser();
+        [$other, $otherToken] = $this->authenticatedUser();
+        $this->assertNotSame($owner->id, $other->id);
+
+        $fixtureResponse = $this->postJson('/api/v1/custom/fixtures', [
+            'home_team_id' => 0,
+            'away_team_id' => 0,
+            'home_team_name' => 'Private Home',
+            'away_team_name' => 'Private Away',
+            'scheduled_at' => '2026-09-12T16:00:00.000000Z',
+        ], ['Authorization' => 'Bearer '.$ownerToken])->assertCreated();
+        $fixtureId = $fixtureResponse->json('data.id');
+        $this->assertSame($owner->id, (int) Fixture::query()->findOrFail($fixtureId)->created_by);
+        $this->assertFalse($other->hasRole('super_admin'));
+        $this->app['auth']->forgetGuards();
+
+        $this->postJson("/api/v1/custom/fixtures/{$fixtureId}/create-match", [], [
+            'Authorization' => 'Bearer '.$otherToken,
+        ])->assertForbidden();
+
+        $this->app['auth']->forgetGuards();
+        $matchResponse = $this->postJson("/api/v1/custom/fixtures/{$fixtureId}/create-match", [], [
+            'Authorization' => 'Bearer '.$ownerToken,
+        ])->assertCreated();
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/matches/'.$matchResponse->json('data.match_id').'/state', [
+            'Authorization' => 'Bearer '.$otherToken,
+        ])->assertNotFound();
+    }
+
+    /**
+     * Phase 0 regression specification. This remains red until the authenticated
+     * match-state policy supports standalone matches without dereferencing a
+     * null tournament.
+     */
+    public function test_custom_live_match_state_is_available_to_its_authenticated_scorer(): void
+    {
+        [, $token] = $this->authenticatedUser();
+
+        $create = $this->postJson('/api/v1/custom/fixtures', [
+            'home_team_id' => 0,
+            'away_team_id' => 0,
+            'home_team_name' => 'Offline Home',
+            'away_team_name' => 'Offline Away',
+            'scheduled_at' => '2026-09-12T16:00:00.000000Z',
+        ], ['Authorization' => 'Bearer '.$token])->assertCreated();
+
+        $fixture = Fixture::query()->findOrFail($create->json('data.id'));
+        $createdMatch = $this->postJson("/api/v1/custom/fixtures/{$fixture->id}/create-match", [], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertCreated();
+
+        $match = CricketMatch::query()->findOrFail($createdMatch->json('data.match_id'));
+        $match->update(['status' => 'live']);
+        MatchInnings::create([
+            'match_id' => $match->id,
+            'innings_number' => 1,
+            'batting_team_id' => $fixture->home_team_id,
+            'bowling_team_id' => $fixture->away_team_id,
+            'status' => 'live',
+            'maximum_overs' => $match->overs_per_innings,
+            'started_at' => now(),
+        ]);
+
+        $this->getJson("/api/v1/matches/{$match->id}/state", [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonPath('data.id', $match->id)
+            ->assertJsonPath('data.status', 'live');
     }
 
     public function test_custom_fixture_status_transition_accepts_in_progress(): void

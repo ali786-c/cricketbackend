@@ -24,7 +24,17 @@ class AdminFixtureController extends Controller
     public function store(Request $request, Tournament $tournament): JsonResponse
     {
         $this->authorizeCreator($tournament, $request);
-        $fixture = $this->fixtures->create($tournament, $this->validated($request), (int) $request->user()->id);
+        $data = $this->validated($request);
+        if (! empty($data['client_uuid'])) {
+            $existing = $tournament->fixtures()
+                ->where('client_uuid', $data['client_uuid'])
+                ->where('created_by', $request->user()->id)
+                ->first();
+            if ($existing) {
+                return response()->json(['data' => $existing->load(['homeTeam', 'awayTeam', 'match']), 'message' => 'Fixture already exists.']);
+            }
+        }
+        $fixture = $this->fixtures->create($tournament, $data, (int) $request->user()->id);
         return response()->json(['data' => $fixture->load(['homeTeam', 'awayTeam']), 'message' => 'Fixture created successfully.'], 201);
     }
 
@@ -46,7 +56,7 @@ class AdminFixtureController extends Controller
     {
         $this->belongs($tournament, $fixture, $request);
         $match = $this->fixtures->createMatch($fixture, (int) $request->user()->id);
-        return response()->json(['data' => ['match_id' => $match->id, 'status' => $match->status], 'message' => 'Operational match created.'], 201);
+        return response()->json(['data' => $this->matchCreatedData($match), 'message' => 'Operational match created.'], 201);
     }
 
     private function validated(Request $request): array
@@ -63,7 +73,8 @@ class AdminFixtureController extends Controller
             'venue' => ['nullable', 'string', 'max:255'], 
             'city' => ['nullable', 'string', 'max:100'], 
             'timezone' => ['required', 'timezone'], 
-            'notes' => ['nullable', 'string', 'max:2000']
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'client_uuid' => ['nullable', 'uuid'],
         ]);
 
         // Auto-create global teams if ID is 0 and name is provided
@@ -107,5 +118,21 @@ class AdminFixtureController extends Controller
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
         abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage fixtures for tournaments you created.');
+    }
+
+    private function matchCreatedData($match): array
+    {
+        $match->load(['fixture.homeTeam', 'fixture.awayTeam', 'players.team']);
+        return [
+            'match_id' => $match->id,
+            'fixture_id' => $match->fixture_id,
+            'client_uuid' => $match->client_uuid,
+            'status' => $match->status,
+            'revision' => $match->revision,
+            'rule_snapshot' => $match->rule_snapshot,
+            'home_team' => $match->fixture?->homeTeam,
+            'away_team' => $match->fixture?->awayTeam,
+            'players' => $match->players,
+        ];
     }
 }

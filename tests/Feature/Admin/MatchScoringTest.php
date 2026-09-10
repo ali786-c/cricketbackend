@@ -42,6 +42,35 @@ class MatchScoringTest extends TestCase
         $this->assertSame(4, $innings->fresh()->total_runs);
         $this->assertSame(1, $innings->fresh()->legal_balls);
         $this->assertSame(4, InningsBattingStat::query()->where('innings_id', $innings->id)->where('match_player_id', $batters[0]->id)->value('runs'));
+        $this->assertSame($batters[0]->id, $innings->fresh()->current_striker_id);
+        $this->assertSame($batters[1]->id, $innings->fresh()->current_non_striker_id);
+        $this->assertSame($bowler->id, $innings->fresh()->current_bowler_id);
+    }
+
+    public function test_active_batters_rotate_and_undo_restores_pre_delivery_state(): void
+    {
+        [$admin, $match, $innings, $batters, $bowler] = $this->liveMatch();
+
+        $this->actingAs($admin)->post(route('admin.matches.scorer.deliveries.store', $match), [
+            'striker_id' => $batters[0]->id,
+            'non_striker_id' => $batters[1]->id,
+            'bowler_id' => $bowler->id,
+            'runs_off_bat' => 1,
+            'expected_revision' => $match->revision,
+        ])->assertRedirect();
+
+        $afterRun = $innings->fresh();
+        $this->assertSame($batters[1]->id, $afterRun->current_striker_id);
+        $this->assertSame($batters[0]->id, $afterRun->current_non_striker_id);
+
+        $this->actingAs($admin)->post(route('admin.matches.scorer.undo', $match), [
+            'reason' => 'Restore active players',
+        ])->assertRedirect();
+
+        $afterUndo = $innings->fresh();
+        $this->assertSame($batters[0]->id, $afterUndo->current_striker_id);
+        $this->assertSame($batters[1]->id, $afterUndo->current_non_striker_id);
+        $this->assertSame($bowler->id, $afterUndo->current_bowler_id);
     }
 
     public function test_wide_adds_runs_without_a_legal_ball(): void
@@ -107,16 +136,19 @@ class MatchScoringTest extends TestCase
         $batters = collect();
         foreach (['A Batter', 'B Batter'] as $name) {
             $user = User::factory()->create(['name' => $name]);
-            $player = PlayerProfile::create(['user_id' => $user->id, 'full_name' => $name, 'playing_role' => 'Batter']);
+            $user->playerProfile()->update(['full_name' => $name, 'playing_role' => 'Batter']);
+            $player = $user->playerProfile()->firstOrFail();
             $tp = TournamentPlayer::create(['tournament_id' => $tournament->id, 'player_profile_id' => $player->id, 'status' => 'approved']);
             $batters->push(MatchPlayer::create(['match_id' => $match->id, 'team_id' => $teams[0]->id, 'tournament_player_id' => $tp->id, 'player_name_snapshot' => $name, 'player_role_snapshot' => 'Batter', 'selection_type' => 'playing_xi', 'batting_order' => $batters->count() + 1]));
         }
         $bowlerUser = User::factory()->create(['name' => 'A Bowler']);
-        $bowlerProfile = PlayerProfile::create(['user_id' => $bowlerUser->id, 'full_name' => 'A Bowler', 'playing_role' => 'Bowler']);
+        $bowlerUser->playerProfile()->update(['full_name' => 'A Bowler', 'playing_role' => 'Bowler']);
+        $bowlerProfile = $bowlerUser->playerProfile()->firstOrFail();
         $bowlerTp = TournamentPlayer::create(['tournament_id' => $tournament->id, 'player_profile_id' => $bowlerProfile->id, 'status' => 'approved']);
         $bowler = MatchPlayer::create(['match_id' => $match->id, 'team_id' => $teams[1]->id, 'tournament_player_id' => $bowlerTp->id, 'player_name_snapshot' => 'A Bowler', 'player_role_snapshot' => 'Bowler', 'selection_type' => 'playing_xi']);
         $secondBowlerUser = User::factory()->create(['name' => 'B Bowler']);
-        $secondBowlerProfile = PlayerProfile::create(['user_id' => $secondBowlerUser->id, 'full_name' => 'B Bowler', 'playing_role' => 'Bowler']);
+        $secondBowlerUser->playerProfile()->update(['full_name' => 'B Bowler', 'playing_role' => 'Bowler']);
+        $secondBowlerProfile = $secondBowlerUser->playerProfile()->firstOrFail();
         $secondTp = TournamentPlayer::create(['tournament_id' => $tournament->id, 'player_profile_id' => $secondBowlerProfile->id, 'status' => 'approved']);
         MatchPlayer::create(['match_id' => $match->id, 'team_id' => $teams[1]->id, 'tournament_player_id' => $secondTp->id, 'player_name_snapshot' => 'B Bowler', 'player_role_snapshot' => 'Bowler', 'selection_type' => 'playing_xi']);
         $innings = MatchInnings::create(['match_id' => $match->id, 'innings_number' => 1, 'batting_team_id' => $teams[0]->id, 'bowling_team_id' => $teams[1]->id, 'status' => 'live', 'maximum_overs' => 20, 'started_at' => now()]);

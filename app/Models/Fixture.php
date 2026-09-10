@@ -14,13 +14,16 @@ class Fixture extends Model
     protected $fillable = [
         'tournament_id', 'home_team_id', 'away_team_id', 'round_number', 'round_name',
         'match_number', 'scheduled_at', 'venue', 'city', 'timezone', 'status',
-        'notes', 'created_by', 'updated_by',
+        'notes', 'client_uuid', 'configuration_snapshot', 'created_by', 'updated_by',
         'stage_id', 'stage_name', 'match_type', 'umpire1', 'umpire2',
     ];
 
     protected function casts(): array
     {
-        return ['scheduled_at' => 'datetime'];
+        return [
+            'scheduled_at' => 'datetime',
+            'configuration_snapshot' => 'array',
+        ];
     }
 
     public function tournament(): BelongsTo { return $this->belongsTo(Tournament::class); }

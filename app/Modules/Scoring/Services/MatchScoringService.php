@@ -26,7 +26,7 @@ class MatchScoringService
 
     public function recordDelivery(CricketMatch $match, array $data, int $actorId, ?int $expectedRevision = null): MatchDelivery
     {
-        return $this->database->transaction(function () use ($match, $data, $actorId, $expectedRevision) {
+        $delivery = $this->database->transaction(function () use ($match, $data, $actorId, $expectedRevision) {
             $match = CricketMatch::query()->with('ruleProfile')->lockForUpdate()->findOrFail($match->id);
             if ($match->status !== 'live' || ! $match->current_innings_id) {
                 $this->fail('match', 'Scoring is only available for a live match.');
@@ -88,6 +88,9 @@ class MatchScoringService
             $bowler = $innings->match->players()->whereKey((int) ($data['bowler_id'] ?? 0))->where('team_id', $innings->bowling_team_id)->where('selection_type', 'playing_xi')->first();
             if (! $striker || ! $nonStriker || $striker->id === $nonStriker->id) $this->fail('players', 'Select two different batting players from the playing XI.');
             if (! $bowler) $this->fail('bowler_id', 'Select a bowler from the opposing playing XI.');
+            if ($innings->current_striker_id && (int) $innings->current_striker_id !== (int) $striker->id) $this->fail('striker_id', 'The striker does not match the current innings state.');
+            if ($innings->current_non_striker_id && (int) $innings->current_non_striker_id !== (int) $nonStriker->id) $this->fail('non_striker_id', 'The non-striker does not match the current innings state.');
+            if ($innings->current_bowler_id && (int) $innings->current_bowler_id !== (int) $bowler->id) $this->fail('bowler_id', 'The bowler cannot change during an over.');
             $bowlerLegalBalls = $innings->deliveries()->whereNull('voided_at')->where('bowler_id', $bowler->id)->where('is_legal_delivery', true)->count();
             if ($bowlerLegalBalls >= ((int) $profile->max_overs_per_bowler * (int) $profile->legal_balls_per_over)) {
                 $this->fail('bowler_id', 'This bowler has reached the maximum overs allowed by the rule profile.');
@@ -137,10 +140,22 @@ class MatchScoringService
                 $delivery->update(['wicket_id' => $wicket->id]);
             }
 
+            [$nextStrikerId, $nextNonStrikerId] = $this->nextBatters($striker->id, $nonStriker->id, $runs, $wicketInput);
+            $legalBallsAfter = (int) $innings->legal_balls + ($legal ? 1 : 0);
+            $deliveriesInOver = $innings->deliveries()->whereNull('voided_at')->where('over_number', $overNumber)->count();
+            $overComplete = ($legal && $legalBallsAfter % (int) $profile->legal_balls_per_over === 0)
+                || ($profile->max_balls_per_over !== null && $deliveriesInOver >= (int) $profile->max_balls_per_over);
+            if ($overComplete) {
+                [$nextStrikerId, $nextNonStrikerId] = [$nextNonStrikerId, $nextStrikerId];
+            }
+
             $innings->update([
                 'total_runs' => $innings->total_runs + $delivery->total_runs,
                 'wickets' => $innings->wickets + ($wicketInput ? 1 : 0),
-                'legal_balls' => $innings->legal_balls + ($legal ? 1 : 0),
+                'legal_balls' => $legalBallsAfter,
+                'current_striker_id' => $nextStrikerId,
+                'current_non_striker_id' => $nextNonStrikerId,
+                'current_bowler_id' => $overComplete ? null : $bowler->id,
             ]);
             $match->update(['revision' => $match->revision + 1, 'last_event_at' => now(), 'updated_by' => $actorId]);
             $this->rebuildStats($innings->fresh(['match']), $match->ruleProfile);
@@ -164,11 +179,19 @@ class MatchScoringService
             if ((int) $current->innings_number >= $totalInnings) $this->fail('innings', 'All innings for this match are already complete.');
 
             $nextNumber = $current->innings_number + 1;
+            $openingBatters = $match->players()
+                ->where('team_id', $current->bowling_team_id)
+                ->where('selection_type', 'playing_xi')
+                ->orderBy('batting_order')
+                ->take(2)
+                ->get();
             $innings = MatchInnings::create([
                 'match_id' => $match->id,
                 'innings_number' => $nextNumber,
                 'batting_team_id' => $current->bowling_team_id,
                 'bowling_team_id' => $current->batting_team_id,
+                'current_striker_id' => $openingBatters->get(0)?->id,
+                'current_non_striker_id' => $openingBatters->get(1)?->id,
                 'status' => 'live',
                 'target_runs' => $current->total_runs + 1,
                 'maximum_overs' => (int) ($match->overs_per_innings ?: $match->ruleProfile->overs_per_innings),
@@ -189,6 +212,11 @@ class MatchScoringService
             if (! $delivery) $this->fail('delivery', 'There is no delivery to undo.');
             $delivery->update(['voided_at' => now(), 'void_reason' => $reason, 'revision' => $delivery->revision + 1]);
             $this->recalculateInningsCache($innings);
+            $innings->update([
+                'current_striker_id' => $delivery->striker_id,
+                'current_non_striker_id' => $delivery->non_striker_id,
+                'current_bowler_id' => $delivery->bowler_id,
+            ]);
             $this->rebuildStats($innings->fresh(['match']), $match->ruleProfile);
             $match->update(['status' => 'live', 'revision' => $match->revision + 1, 'last_event_at' => now(), 'updated_by' => $actorId]);
         });
@@ -280,6 +308,22 @@ class MatchScoringService
             'leg_byes' => (int) ($data['leg_byes'] ?? 0),
             'penalty_runs' => (int) ($data['penalty_runs'] ?? 0),
         ];
+    }
+
+    private function nextBatters(int $strikerId, int $nonStrikerId, array $runs, ?array $wicket): array
+    {
+        $runningRuns = $runs['runs_off_bat'] + $runs['byes'] + $runs['leg_byes'];
+        if ($runningRuns % 2 === 1) {
+            [$strikerId, $nonStrikerId] = [$nonStrikerId, $strikerId];
+        }
+
+        if ($wicket) {
+            $dismissedId = (int) ($wicket['dismissed_player_id'] ?? 0);
+            if ($strikerId === $dismissedId) $strikerId = 0;
+            if ($nonStrikerId === $dismissedId) $nonStrikerId = 0;
+        }
+
+        return [$strikerId ?: null, $nonStrikerId ?: null];
     }
 
     private function validateExtras(array $runs, $profile): void

@@ -139,18 +139,22 @@ class MatchTest extends TestCase
             'default_pick_duration' => 60,
             'default_overs_per_innings' => 14,
             'cricket_rule_profile_id' => $profile->id,
+            'has_draft' => true,
+            'creator_id' => $admin->id,
         ]);
         $teams = collect([
             Team::create(['tournament_id' => $tournament->id, 'name' => 'Alpha XI', 'short_name' => 'AX', 'display_order' => 1]),
             Team::create(['tournament_id' => $tournament->id, 'name' => 'Bravo XI', 'short_name' => 'BX', 'display_order' => 2]),
         ]);
+        $tournament->teams()->attach($teams->pluck('id'));
         $draft = Draft::create(['tournament_id' => $tournament->id, 'status' => 'completed', 'revision' => 9, 'completed_at' => now()]);
         $round = DraftRound::create(['draft_id' => $draft->id, 'round_number' => 1, 'status' => 'completed', 'completed_at' => now()]);
         $pickNumber = 1;
         foreach ($teams as $teamIndex => $team) {
             for ($slot = 1; $slot <= 2; $slot++) {
                 $user = User::factory()->create(['name' => 'Player '.$pickNumber]);
-                $player = PlayerProfile::create(['user_id' => $user->id, 'full_name' => 'Player '.$pickNumber, 'playing_role' => 'Batter']);
+                $user->playerProfile()->update(['full_name' => 'Player '.$pickNumber, 'playing_role' => 'Batter']);
+                $player = $user->playerProfile()->firstOrFail();
                 $tournamentPlayer = TournamentPlayer::create(['tournament_id' => $tournament->id, 'player_profile_id' => $player->id, 'status' => 'approved', 'reviewed_by' => $admin->id, 'reviewed_at' => now()]);
                 DraftPick::create(['draft_id' => $draft->id, 'draft_round_id' => $round->id, 'team_id' => $team->id, 'pick_number' => $pickNumber++, 'pick_duration' => 60, 'status' => 'selected', 'tournament_player_id' => $tournamentPlayer->id, 'selected_by' => $admin->id, 'selected_at' => now()]);
             }
