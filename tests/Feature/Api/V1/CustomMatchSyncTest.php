@@ -160,6 +160,7 @@ class CustomMatchSyncTest extends TestCase
                 'format' => 'custom',
                 'innings_per_side' => 1,
                 'overs_per_innings' => 6,
+                'squad_size' => 8,
                 'playing_xi_size' => 6,
                 'maximum_wickets' => 5,
                 'legal_balls_per_over' => 6,
@@ -191,8 +192,11 @@ class CustomMatchSyncTest extends TestCase
         $this->assertSame(6, $match->overs_per_innings);
         $this->assertSame('custom', $match->rule_snapshot['format']);
         $this->assertSame(6, $match->rule_snapshot['playing_xi_size']);
+        $this->assertSame(8, $match->rule_snapshot['squad_size']);
         $this->assertSame(5, $match->rule_snapshot['maximum_wickets']);
         $this->assertSame('tennis', $match->rule_snapshot['ball_type']);
+        $this->assertSame('custom', $match->rule_snapshot['origin']);
+        $this->assertNotNull($match->rule_snapshot['locked_at']);
 
         // The match keeps its immutable snapshot even if the profile changes later.
         $match->ruleProfile->update(['maximum_wickets' => 4]);

@@ -32,7 +32,8 @@ class FixtureRepository @Inject constructor(
     private val tournamentDao: com.devwithguru.cricket.data.db.dao.TournamentDao,
     private val apiService: com.devwithguru.cricket.data.api.ApiService,
     private val authRepository: AuthRepository,
-    private val teamRepository: TeamRepository
+    private val teamRepository: TeamRepository,
+    private val deliverySyncRepository: DeliverySyncRepository
 ) {
     /**
      * Get all fixtures for a tournament (Flow)
@@ -455,7 +456,23 @@ class FixtureRepository @Inject constructor(
             match_number = fixture.matchNumber,
             scheduled_at = scheduledAt,
             venue = fixture.venue,
-            city = fixture.city
+            city = fixture.city,
+            client_uuid = java.util.UUID.nameUUIDFromBytes(fixture.id.toByteArray()).toString(),
+            configuration = getScheduledFixtureById(fixture.id)?.let { local ->
+                com.devwithguru.cricket.data.api.CustomMatchConfiguration(
+                    format = local.matchType.trim().lowercase().replace(" ", "_"),
+                    innings_per_side = 1,
+                    overs_per_innings = local.overs,
+                    playing_xi_size = local.wickets + 1,
+                    maximum_wickets = local.wickets,
+                    legal_balls_per_over = fixture.ballsPerOver,
+                    max_overs_per_bowler = maxOf(1, (local.overs + 4) / 5),
+                    ball_type = when (local.ballType.trim().lowercase().replace(" ", "_")) {
+                        "leather", "tennis", "hard_ball", "tape_ball", "indoor" -> local.ballType.trim().lowercase().replace(" ", "_")
+                        else -> "tennis"
+                    }
+                )
+            }
         )
 
         val response = apiService.createCustomFixture(authHeader, body)
@@ -473,16 +490,62 @@ class FixtureRepository @Inject constructor(
      * Backend is idempotent (rejects duplicate match creation), so the call is
      * safe to repeat. Standalone fixtures (tournamentId "0") use the custom route.
      */
-    suspend fun createOperationalMatchIfNeeded(fixtureId: String) {
-        val fixture = adminFixtureDao.findById(fixtureId) ?: return
-        val serverFixtureId = fixture.serverId ?: return
-        val token = authRepository.getRawToken() ?: return
+    suspend fun createOperationalMatchIfNeeded(fixtureId: String): Result<Int> {
+        val fixture = adminFixtureDao.findById(fixtureId) ?: return Result.failure(IllegalStateException("Fixture is not persisted"))
+        fixture.serverMatchId?.let { return Result.success(it) }
+        val serverFixtureId = fixture.serverId ?: return Result.failure(IllegalStateException("Fixture has not synced yet"))
+        val token = authRepository.getRawToken() ?: return Result.failure(IllegalStateException("Authentication is required"))
         val authHeader = "Bearer $token"
         val tournamentId = fixture.tournamentId
-        if (tournamentId.isBlank() || tournamentId == "0" || tournamentId == "custom") {
-            apiService.createCustomMatch(authHeader, serverFixtureId.toString())
-        } else {
-            apiService.createMatchFromFixture(authHeader, tournamentId, serverFixtureId.toString())
+        return try {
+            val response = if (tournamentId.isBlank() || tournamentId == "0" || tournamentId == "custom") {
+                apiService.createCustomMatch(authHeader, serverFixtureId.toString())
+            } else {
+                apiService.createMatchFromFixture(authHeader, tournamentId, serverFixtureId.toString())
+            }
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
+                adminFixtureDao.updateOperationalMatch(fixture.id, data.match_id, data.revision, data.status ?: "squad_selection")
+                Result.success(data.match_id)
+            } else Result.failure(IllegalStateException(response.errorBody()?.string() ?: "Operational match creation failed"))
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
+
+    suspend fun startCustomOperationalMatch(
+        fixtureId: String,
+        homeLineup: List<String>,
+        awayLineup: List<String>,
+        tossWinnerName: String,
+        tossDecision: String
+    ): Result<Unit> {
+        val operationalId = createOperationalMatchIfNeeded(fixtureId).getOrElse { return Result.failure(it) }
+        val fixture = getScheduledFixtureById(fixtureId) ?: return Result.failure(IllegalStateException("Local match is missing"))
+        val token = authRepository.getRawToken() ?: return Result.failure(IllegalStateException("Authentication is required"))
+        val winnerSide = if (tossWinnerName.equals(fixture.homeTeam, ignoreCase = true)) "home" else "away"
+        return try {
+            val response = apiService.startCustomMatch(
+                "Bearer $token",
+                operationalId.toString(),
+                com.devwithguru.cricket.data.api.StartCustomMatchRequest(
+                    home_lineup = homeLineup.map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
+                    away_lineup = awayLineup.map { com.devwithguru.cricket.data.api.StartLineupPlayer(it) },
+                    toss_winner = winnerSide,
+                    toss_decision = tossDecision.lowercase()
+                )
+            )
+            val data = response.body()?.data
+            if (response.isSuccessful && data != null) {
+                adminFixtureDao.updateOperationalMatch(fixtureId, data.match_id, data.revision, data.status)
+                saveFixture(fixture.copy(
+                    status = "Live",
+                    playerServerIds = data.players.associate { it.name to it.match_player_id }
+                ))
+                Result.success(Unit)
+            } else Result.failure(IllegalStateException(response.errorBody()?.string() ?: "Match start failed"))
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 
@@ -532,13 +595,54 @@ class FixtureRepository @Inject constructor(
     fun getAllFixtures(): Flow<List<com.devwithguru.cricket.domain.model.ScheduledFixture>> {
         // Use an empty tournamentId to get all — or use a broader query
         // For now, return empty flow (existing callers will use tournament-specific queries)
-        return kotlinx.coroutines.flow.flow { emit(emptyList()) }
+        return fixtureDao.getAllFixtures().map { rows -> rows.map { it.toScheduledDomain() } }
     }
 
     /**
      * Get fixtures by status as ScheduledFixture list.
      */
     fun getFixturesByStatus(status: String): Flow<List<com.devwithguru.cricket.domain.model.ScheduledFixture>> {
-        return kotlinx.coroutines.flow.flow { emit(emptyList()) }
+        return fixtureDao.getAllFixtures().map { rows ->
+            rows.filter { it.status.equals(status, ignoreCase = true) }.map { it.toScheduledDomain() }
+        }
+    }
+
+    suspend fun resolveServerMatchId(localOrServerId: String): String? {
+        localOrServerId.toIntOrNull()?.let { numeric ->
+            if (adminFixtureDao.findByServerMatchId(numeric) != null) return localOrServerId
+        }
+        return adminFixtureDao.findById(resolveOriginalFixtureId(localOrServerId))?.serverMatchId?.toString()
+    }
+
+    suspend fun persistNextInnings(fixture: ScheduledFixture): Result<Unit> {
+        saveFixture(fixture)
+        return syncNextInnings(fixture)
+    }
+
+    suspend fun syncNextInnings(fixture: ScheduledFixture): Result<Unit> {
+        val serverMatchId = resolveServerMatchId(fixture.id)
+        if (serverMatchId != null) {
+            deliverySyncRepository.syncMatchDeliveries(fixture.id)
+            val token = authRepository.getToken() ?: return Result.failure(IllegalStateException("Authentication is required"))
+            val response = try { apiService.startNextInnings(token, serverMatchId) } catch (error: Exception) { return Result.failure(error) }
+            if (!response.isSuccessful) return Result.failure(IllegalStateException(response.errorBody()?.string() ?: "Next innings could not start"))
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun persistCompletedMatch(fixture: ScheduledFixture): Result<Unit> {
+        saveFixture(fixture)
+        return syncCompletedMatch(fixture)
+    }
+
+    suspend fun syncCompletedMatch(fixture: ScheduledFixture): Result<Unit> {
+        val serverMatchId = resolveServerMatchId(fixture.id)
+        if (serverMatchId != null) {
+            deliverySyncRepository.syncMatchDeliveries(fixture.id)
+            val token = authRepository.getToken() ?: return Result.failure(IllegalStateException("Authentication is required"))
+            val response = try { apiService.submitMatchResult(token, serverMatchId) } catch (error: Exception) { return Result.failure(error) }
+            if (!response.isSuccessful) return Result.failure(IllegalStateException(response.errorBody()?.string() ?: "Final result could not be persisted"))
+        }
+        return Result.success(Unit)
     }
 }

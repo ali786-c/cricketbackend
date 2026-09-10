@@ -15,6 +15,9 @@ interface PlayerDao {
     @Query("SELECT * FROM players WHERE id = :id")
     suspend fun findById(id: String): PlayerEntity?
 
+    @Query("SELECT * FROM players WHERE id = :query OR uniqueCode = :query OR LOWER(name) LIKE '%' || LOWER(:query) || '%' ORDER BY CASE WHEN uniqueCode = :query THEN 0 ELSE 1 END, name LIMIT 1")
+    suspend fun searchOne(query: String): PlayerEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlayer(player: PlayerEntity): Long
 

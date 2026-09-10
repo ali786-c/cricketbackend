@@ -64,6 +64,7 @@ fun com.devwithguru.cricket.data.db.entity.FixtureEntity.toScheduledDomain(gson:
     val bowlerStateToken = object : com.google.gson.reflect.TypeToken<List<com.devwithguru.cricket.domain.model.BowlerState>>() {}.type
     val wicketEventToken = object : com.google.gson.reflect.TypeToken<List<com.devwithguru.cricket.domain.model.WicketEvent>>() {}.type
     val partnershipToken = object : com.google.gson.reflect.TypeToken<List<com.devwithguru.cricket.domain.model.PartnershipEvent>>() {}.type
+    val playerIdMapToken = object : com.google.gson.reflect.TypeToken<Map<String, Int>>() {}.type
 
     return ScheduledFixture(
         id = id,
@@ -73,6 +74,7 @@ fun com.devwithguru.cricket.data.db.entity.FixtureEntity.toScheduledDomain(gson:
         ballType = ballType,
         matchType = matchType,
         wickets = wickets,
+        ballsPerOver = ballsPerOver,
         venue = venue,
         date = date,
         time = time,
@@ -103,7 +105,8 @@ fun com.devwithguru.cricket.data.db.entity.FixtureEntity.toScheduledDomain(gson:
         firstInningsExtras = firstInningsExtras,
         secondInningsExtras = secondInningsExtras,
         firstInningsDotBalls = firstInningsDotBalls,
-        secondInningsDotBalls = secondInningsDotBalls
+        secondInningsDotBalls = secondInningsDotBalls,
+        playerServerIds = gson.fromJson(playerServerIds, playerIdMapToken) ?: emptyMap()
     )
 }
 
@@ -115,6 +118,7 @@ fun ScheduledFixture.toEntity(gson: Gson = Gson()) = com.devwithguru.cricket.dat
     ballType = ballType,
     matchType = matchType,
     wickets = wickets,
+    ballsPerOver = ballsPerOver,
     venue = venue,
     date = date,
     time = time,
@@ -145,5 +149,6 @@ fun ScheduledFixture.toEntity(gson: Gson = Gson()) = com.devwithguru.cricket.dat
     firstInningsExtras = firstInningsExtras,
     secondInningsExtras = secondInningsExtras,
     firstInningsDotBalls = firstInningsDotBalls,
-    secondInningsDotBalls = secondInningsDotBalls
+    secondInningsDotBalls = secondInningsDotBalls,
+    playerServerIds = gson.toJson(playerServerIds)
 )

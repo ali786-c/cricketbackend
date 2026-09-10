@@ -49,16 +49,12 @@ class MatchCenterViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            // Step 1: Pre-sync — push local data first, then pull server data
-            if (syncManager.isOnline()) {
-                _isPreSyncing.value = true
-                try {
-                    syncManager.pushPendingChanges()
-                    syncManager.pullLatestData()
-                } catch (_: Exception) { }
-                _isPreSyncing.value = false
-            }
+            val localFixture = fixtureRepository.getScheduledFixtureById(matchId)
+            _fixture.value = localFixture
+            _isLive.value = localFixture?.status == "Live"
+            _isLoading.value = false
 
+            // Step 1: Pre-sync — push local data first, then pull server data
             // Step 2: Load from Room (now has fresh server data)
             try {
                 matchApiRepository.getMatchState(matchId).collect { fixture ->
@@ -77,6 +73,8 @@ class MatchCenterViewModel @Inject constructor(
                 _fixture.value = roomFixture
                 if (roomFixture != null) {
                     _isLive.value = roomFixture.status == "Live"
+                } else {
+                    _error.value = e.message ?: "Match data could not be loaded"
                 }
             } finally {
                 _isLoading.value = false
@@ -147,12 +145,6 @@ class MatchCenterViewModel @Inject constructor(
         viewModelScope.launch {
             fixtureRepository.updateFixture(fixture)
             _fixture.value = fixture
-            // If status changed, update it on server too
-            if (fixture.status == "Completed" || fixture.status == "Live") {
-                try {
-                    fixtureRepository.updateStatus(fixture.id, fixture.status)
-                } catch (_: Exception) { }
-            }
         }
     }
 

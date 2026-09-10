@@ -533,19 +533,22 @@ class MainActivity : ComponentActivity() {
                                             f.strikerName = ""
                                             f.nonStrikerName = ""
 
-                                            Toast.makeText(context, String.format(msgInningsCompleteFormat, runs + 1), Toast.LENGTH_LONG).show()
-
-                                            // Update the current screen state in place on the stack to reflect the new innings parameters
-                                            navigationViewModel.updateCurrentScreen(screen, screen.copy(isScorer = true))
+                                            mainViewModel.advanceToNextInnings(f) {
+                                                Toast.makeText(context, String.format(msgInningsCompleteFormat, runs + 1), Toast.LENGTH_LONG).show()
+                                                navigationViewModel.updateCurrentScreen(screen, screen.copy(isScorer = true))
+                                            }
+                                            return@let
                                         } else {
                                             // Innings 2 declared - Match Completed
                                             f.status = "Completed"
                                             f.currentRuns = runs
                                             f.currentWickets = wickets
                                             f.oversBowled = overs
-                                            Toast.makeText(context, msgMatchCompletedResultsSaved, Toast.LENGTH_LONG).show()
-                                            // Go back to previous screen (Hub or Home)
-                                            navigationViewModel.navigateBack()
+                                            mainViewModel.completeMatch(f) {
+                                                Toast.makeText(context, msgMatchCompletedResultsSaved, Toast.LENGTH_LONG).show()
+                                                navigationViewModel.clearAndNavigateTo(Screen.Home)
+                                            }
+                                            return@let
                                         }
                                         // Persist fixture changes to Room
                                         mainViewModel.updateFixture(f)

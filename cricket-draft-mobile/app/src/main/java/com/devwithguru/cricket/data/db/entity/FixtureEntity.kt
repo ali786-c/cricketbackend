@@ -13,6 +13,7 @@ data class FixtureEntity(
     val ballType: String,
     val matchType: String,
     val wickets: Int,
+    val ballsPerOver: Int = 6,
     val venue: String,
     val date: String,
     val time: String,
@@ -43,5 +44,6 @@ data class FixtureEntity(
     val firstInningsExtras: Int = 0,
     val secondInningsExtras: Int = 0,
     val firstInningsDotBalls: Int = 0,
-    val secondInningsDotBalls: Int = 0
+    val secondInningsDotBalls: Int = 0,
+    val playerServerIds: String = "{}"
 )

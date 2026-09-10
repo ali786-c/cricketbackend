@@ -36,6 +36,9 @@ class MainViewModel @Inject constructor(
     private val _preSyncMessage = MutableStateFlow<String?>(null)
     val preSyncMessage: StateFlow<String?> = _preSyncMessage
 
+    private val _lifecycleError = MutableStateFlow<String?>(null)
+    val lifecycleError: StateFlow<String?> = _lifecycleError
+
     private val _currentFixture = MutableStateFlow<ScheduledFixture?>(null)
     val currentFixture: StateFlow<ScheduledFixture?> = _currentFixture
 
@@ -72,6 +75,26 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun completeMatch(fixture: ScheduledFixture, onPersisted: () -> Unit) {
+        viewModelScope.launch {
+            fixtureRepository.updateFixture(fixture)
+            _currentFixture.value = fixture
+            onPersisted()
+            val result = fixtureRepository.syncCompletedMatch(fixture)
+            if (result.isFailure) _lifecycleError.value = result.exceptionOrNull()?.message
+        }
+    }
+
+    fun advanceToNextInnings(fixture: ScheduledFixture, onPersisted: () -> Unit) {
+        viewModelScope.launch {
+            fixtureRepository.updateFixture(fixture)
+            _currentFixture.value = fixture
+            onPersisted()
+            val result = fixtureRepository.syncNextInnings(fixture)
+            if (result.isFailure) _lifecycleError.value = result.exceptionOrNull()?.message
+        }
+    }
+
     fun saveTossDetails(matchId: String, winner: String, decision: String) {
         viewModelScope.launch {
             fixtureRepository.saveTossDetails(matchId, winner, decision)
@@ -96,9 +119,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             // Step 1: Pre-sync — push local, then pull server
             _isPreSyncing.value = true
-            _preSyncMessage.value = "Syncing before going live..."
-            val syncResult = syncManager.preSyncBeforeLiveScoring()
-            _preSyncMessage.value = if (syncResult.success) "Synced ✓" else "Sync partial"
+            _preSyncMessage.value = "Saving match..."
 
             // Step 2: Re-read fixture after sync (server may have updated it)
             val fixture = fixtureRepository.getScheduledFixtureById(matchId)
@@ -114,6 +135,12 @@ class MainViewModel @Inject constructor(
                 _currentFixture.value = f
             }
 
+            // Local persistence is enough to enter scoring. Slow/offline network
+            // work below cannot block navigation or ball input.
+            _isPreSyncing.value = false
+            _preSyncMessage.value = null
+            onComplete()
+
             // Step 4: Queue the Live status for server sync
             if (fixture != null) {
                 val adminFixture = fixtureRepository.getAdminFixtureById(fixture.id)
@@ -125,7 +152,22 @@ class MainViewModel @Inject constructor(
 
                 // Step 4b: create the operational match server-side so the game
                 // appears in the SuperAdmin Matches tab immediately
-                fixtureRepository.createOperationalMatchIfNeeded(fixture.id)
+                val customMatch = adminFixture?.tournamentId.isNullOrBlank() || adminFixture?.tournamentId == "0" || adminFixture?.tournamentId == "custom"
+                if (customMatch) {
+                    val started = fixtureRepository.startCustomOperationalMatch(
+                        fixture.id, homeSquad, awaySquad, tossWinner, tossDecision
+                    )
+                    if (started.isFailure && syncManager.isOnline()) {
+                        _lifecycleError.value = started.exceptionOrNull()?.message ?: "Unable to start match"
+                        return@launch
+                    }
+                } else {
+                    val created = fixtureRepository.createOperationalMatchIfNeeded(fixture.id)
+                    if (created.isFailure && syncManager.isOnline()) {
+                        _lifecycleError.value = created.exceptionOrNull()?.message ?: "Unable to create operational match"
+                        return@launch
+                    }
+                }
 
                 syncManager.queueChange(
                     "fixture", fixture.id, "update",
@@ -133,9 +175,6 @@ class MainViewModel @Inject constructor(
                 )
             }
 
-            _isPreSyncing.value = false
-            _preSyncMessage.value = null
-            onComplete()
         }
     }
 }

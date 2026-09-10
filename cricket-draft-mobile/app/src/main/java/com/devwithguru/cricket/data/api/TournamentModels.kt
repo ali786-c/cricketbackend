@@ -228,7 +228,31 @@ data class CreateFixtureRequest(
     val venue: String? = null,
     val city: String? = null,
     val timezone: String = "Asia/Karachi",
-    val notes: String? = null
+    val notes: String? = null,
+    val client_uuid: String? = null,
+    val configuration: CustomMatchConfiguration? = null
+)
+
+data class CustomMatchConfiguration(
+    val format: String,
+    val innings_per_side: Int,
+    val overs_per_innings: Int,
+    val squad_size: Int? = null,
+    val playing_xi_size: Int,
+    val maximum_wickets: Int,
+    val legal_balls_per_over: Int,
+    val max_overs_per_bowler: Int,
+    val ball_type: String,
+    val no_ball_runs: Int = 1,
+    val wide_runs: Int = 1,
+    val wide_runs_to_batsman: Boolean = false,
+    val noball_runs_to_batsman: Boolean = false,
+    val last_man_standing: Boolean = false,
+    val max_balls_per_over: Int? = null,
+    val max_runs_per_over: Int? = null,
+    val origin: String = "custom",
+    val version: Int = 1,
+    val locked_at: String? = null
 )
 
 data class AdminFixtureResponse(
@@ -329,7 +353,42 @@ data class CreateMatchFromFixtureResponse(
 
 data class CreateMatchFromFixtureData(
     val match_id: Int,
-    val status: String?
+    val status: String?,
+    val revision: Int? = null,
+    val fixture_id: Int? = null,
+    val home_team: TeamData? = null,
+    val away_team: TeamData? = null
+)
+
+data class StartCustomMatchRequest(
+    val home_lineup: List<StartLineupPlayer>,
+    val away_lineup: List<StartLineupPlayer>,
+    val toss_winner: String,
+    val toss_decision: String
+)
+
+data class StartLineupPlayer(
+    val name: String,
+    val public_player_id: String? = null,
+    val role: String? = null
+)
+
+data class StartCustomMatchResponse(val data: StartedMatchData)
+
+data class StartedMatchData(
+    val match_id: Int,
+    val status: String,
+    val revision: Int,
+    val current_innings_id: Int?,
+    val players: List<StartedMatchPlayer>
+)
+
+data class StartedMatchPlayer(
+    val match_player_id: Int,
+    val public_player_id: String?,
+    val team_id: Int,
+    val name: String,
+    val role: String?
 )
 
 // ─── Offline Sync Models ──────────────────────────────────

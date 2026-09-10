@@ -41,7 +41,9 @@ fun PlayerMatchesTab(
 ) {
     LaunchedEffect(Unit) { viewModel.loadAllFixtures() }
     val allFixtures by viewModel.fixtures.collectAsState()
-    val liveMatches = allFixtures.filter { it.status.lowercase() == "live" }
+    val liveMatches = allFixtures.filter {
+        it.status.lowercase() in setOf("created", "squad_selection", "lineup_pending", "toss_pending", "toss_completed", "ready", "live", "in_progress", "innings_break")
+    }
     val scheduledMatches = allFixtures.filter { it.status.lowercase() == "scheduled" || it.status.lowercase() == "upcoming" }
     val completedMatches = allFixtures.filter { it.status.lowercase() == "completed" }
 

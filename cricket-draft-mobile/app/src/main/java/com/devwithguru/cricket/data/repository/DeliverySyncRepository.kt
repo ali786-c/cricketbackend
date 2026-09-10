@@ -5,6 +5,10 @@ import com.devwithguru.cricket.data.api.SyncDeliveriesRequest
 import com.devwithguru.cricket.data.api.SyncDeliveryData
 import com.devwithguru.cricket.data.api.SyncWicketData
 import com.devwithguru.cricket.data.db.dao.PendingDeliveryDao
+import com.devwithguru.cricket.data.db.dao.AdminFixtureDao
+import com.devwithguru.cricket.data.db.dao.FixtureDao
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.devwithguru.cricket.data.db.entity.PendingDeliveryEntity
 import com.devwithguru.cricket.data.sync.ConnectivityMonitor
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +29,9 @@ class DeliverySyncRepository @Inject constructor(
     private val pendingDeliveryDao: PendingDeliveryDao,
     private val apiService: ApiService,
     private val authRepository: AuthRepository,
-    private val connectivityMonitor: ConnectivityMonitor
+    private val connectivityMonitor: ConnectivityMonitor,
+    private val adminFixtureDao: AdminFixtureDao,
+    private val fixtureDao: FixtureDao
 ) {
     /**
      * Save a delivery to Room (called after each scoring action in LiveScorerViewModel).
@@ -63,6 +69,9 @@ class DeliverySyncRepository @Inject constructor(
         return pendingDeliveryDao.getLatestDelivery(matchId)
     }
 
+    suspend fun hasUnsyncedDeliveries(matchId: String): Boolean =
+        pendingDeliveryDao.getUnsyncedDeliveryCount(matchId) > 0
+
     /**
      * Push all pending deliveries for a specific match to the API.
      * Returns true if all deliveries synced successfully.
@@ -72,11 +81,14 @@ class DeliverySyncRepository @Inject constructor(
 
         val token = authRepository.getToken() ?: return false
         val pending = pendingDeliveryDao.getDeliveriesForMatch(matchId)
-            .filter { it.syncStatus == "pending" }
+            .filter { it.syncStatus != "synced" }
 
         if (pending.isEmpty()) return true
 
         return try {
+            val idMapType = object : TypeToken<Map<String, Int>>() {}.type
+            val idMap: Map<String, Int> = fixtureDao.findById(matchId)?.playerServerIds
+                ?.let { Gson().fromJson(it, idMapType) } ?: emptyMap()
             val syncItems = pending.map { delivery ->
                 SyncDeliveryData(
                     local_uuid = delivery.localUuid,
@@ -84,25 +96,26 @@ class DeliverySyncRepository @Inject constructor(
                         "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
                         java.util.Locale.US
                     ).format(java.util.Date(delivery.deviceTimestamp)),
-                    striker_id = delivery.strikerId,
-                    non_striker_id = delivery.nonStrikerId,
-                    bowler_id = delivery.bowlerId,
+                    striker_id = delivery.strikerId.takeIf { it > 0 } ?: idMap[delivery.strikerName] ?: 0,
+                    non_striker_id = delivery.nonStrikerId.takeIf { it > 0 } ?: idMap[delivery.nonStrikerName] ?: 0,
+                    bowler_id = delivery.bowlerId.takeIf { it > 0 } ?: idMap[delivery.bowlerName] ?: 0,
                     runs_off_bat = delivery.runsOffBat,
                     wides = if (delivery.wides > 0) delivery.wides else null,
                     no_balls = if (delivery.noBalls > 0) delivery.noBalls else null,
                     byes = if (delivery.byes > 0) delivery.byes else null,
                     leg_byes = if (delivery.legByes > 0) delivery.legByes else null,
                     penalty_runs = if (delivery.penaltyRuns > 0) delivery.penaltyRuns else null,
-                    wicket = if (delivery.wicketDismissedPlayerId != null) {
+                    wicket = if (delivery.wicketDismissedPlayerId != null || delivery.wicketDismissedPlayerName != null) {
                         SyncWicketData(
-                            dismissed_player_id = delivery.wicketDismissedPlayerId,
+                            dismissed_player_id = delivery.wicketDismissedPlayerId ?: idMap[delivery.wicketDismissedPlayerName] ?: 0,
                             dismissal_type = delivery.wicketDismissalType ?: "",
-                            fielder_id = delivery.wicketFielderId,
+                            fielder_id = delivery.wicketFielderId ?: delivery.wicketFielderName?.let { idMap[it] },
                             runs_completed = delivery.wicketRunsCompleted
                         )
                     } else null
                 )
             }
+            if (syncItems.any { it.striker_id == 0 || it.non_striker_id == 0 || it.bowler_id == 0 || it.wicket?.dismissed_player_id == 0 }) return false
 
             // Mark as syncing
             pending.forEach { delivery ->
@@ -110,14 +123,15 @@ class DeliverySyncRepository @Inject constructor(
             }
 
             val request = SyncDeliveriesRequest(deliveries = syncItems)
-            val response = apiService.syncDeliveries(token, matchId, request)
+            val serverMatchId = adminFixtureDao.findById(matchId)?.serverMatchId?.toString()
+                ?: matchId.toIntOrNull()?.toString()
+                ?: return false
+            val response = apiService.syncDeliveries(token, serverMatchId, request)
 
             if (response.isSuccessful) {
-                // Mark all as synced
+                // Keep acknowledged rows as the local delivery history used for
+                // offline resume/recent-ball reconstruction.
                 pendingDeliveryDao.markSynced(pending.map { it.id })
-                // Cleanup old synced deliveries
-                pendingDeliveryDao.deleteSynced()
-                pendingDeliveryDao.deleteOldFailed()
                 true
             } else {
                 // Mark as failed

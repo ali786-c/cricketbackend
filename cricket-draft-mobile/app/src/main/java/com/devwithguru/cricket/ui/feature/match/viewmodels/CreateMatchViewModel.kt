@@ -101,10 +101,11 @@ class CreateMatchViewModel @Inject constructor(
             _isSaving.value = true
             try {
                 fixtureRepository.saveFixtureWithSync(fixture)
+                _saveSuccess.value = fixture.id
+                _isSaving.value = false
+                onReady()
                 fixtureRepository.pushPendingFixtureToServer(fixture.id)
                 syncManager.pushPendingChanges()
-                _saveSuccess.value = fixture.id
-                onReady()
             } finally {
                 _isSaving.value = false
             }

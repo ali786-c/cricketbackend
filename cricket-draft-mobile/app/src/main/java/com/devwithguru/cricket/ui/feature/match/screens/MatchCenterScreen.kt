@@ -69,6 +69,10 @@ fun MatchCenterScreen(
 ) {
     LaunchedEffect(matchId) { matchCenterViewModel.loadFixture(matchId) }
     val activeFixture by matchCenterViewModel.fixture.collectAsState()
+    LaunchedEffect(matchId, activeFixture?.currentInnings, activeFixture?.playerServerIds) {
+        scorerViewModel.setMatchContext(matchId, activeFixture?.currentInnings ?: 1)
+        scorerViewModel.setPlayerServerIds(activeFixture?.playerServerIds ?: emptyMap())
+    }
     var currentInnings by remember(activeFixture?.id, activeFixture?.currentInnings) {
         mutableStateOf(activeFixture?.currentInnings ?: 1)
     }
@@ -208,7 +212,7 @@ fun MatchCenterScreen(
                                     awayTeamName = bowlingTeam,
                                     homeSquadList = if (isFixtureInnings2) fAwaySquad else fHomeSquad,
                                     awaySquadList = if (isFixtureInnings2) fHomeSquad else fAwaySquad,
-                                    ballsPerOver = 6,
+                                    ballsPerOver = activeFixture?.ballsPerOver ?: 6,
                                     initialRuns = if (dbInningsMatches) activeFixture?.currentRuns ?: 0 else 0,
                                     initialWickets = if (dbInningsMatches) activeFixture?.currentWickets ?: 0 else 0,
                                     initialOversBowled = if (dbInningsMatches) activeFixture?.oversBowled ?: "0.0" else "0.0",

@@ -89,6 +89,7 @@ class CustomFixtureController extends Controller
             'configuration.format' => ['required_with:configuration', 'string', 'max:30'],
             'configuration.innings_per_side' => ['required_with:configuration', 'integer', 'min:1', 'max:4'],
             'configuration.overs_per_innings' => ['required_with:configuration', 'integer', 'min:1', 'max:100'],
+            'configuration.squad_size' => ['nullable', 'integer', 'min:2', 'max:200', 'gte:configuration.playing_xi_size'],
             'configuration.playing_xi_size' => ['required_with:configuration', 'integer', 'min:2', 'max:99'],
             'configuration.maximum_wickets' => ['required_with:configuration', 'integer', 'min:1', 'max:98', 'lt:configuration.playing_xi_size'],
             'configuration.legal_balls_per_over' => ['required_with:configuration', 'integer', 'min:1', 'max:12'],
@@ -101,6 +102,8 @@ class CustomFixtureController extends Controller
             'configuration.last_man_standing' => ['nullable', 'boolean'],
             'configuration.max_balls_per_over' => ['nullable', 'integer', 'min:1', 'max:24'],
             'configuration.max_runs_per_over' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'configuration.origin' => ['nullable', 'in:custom'],
+            'configuration.version' => ['nullable', 'integer', 'min:1'],
         ]);
 
         // Auto-create global teams if ID is 0 and name is provided

@@ -34,7 +34,8 @@ class MatchApiRepository @Inject constructor(
         // 2. Try fetching from API
         try {
             val token = authTokenProvider()
-            val response = apiService.getMatchState(matchId, token)
+            val serverMatchId = fixtureRepository.resolveServerMatchId(matchId) ?: return@flow
+            val response = apiService.getMatchState(serverMatchId, token)
 
             if (response.isSuccessful) {
                 val body = response.body()
@@ -56,9 +57,7 @@ class MatchApiRepository @Inject constructor(
                             awayTeam = finalAway,
                             venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
                             date = if (fixture.date.isBlank()) cached.date else fixture.date,
-                            time = if (fixture.time.isBlank()) cached.time else fixture.time,
-                            wickets = cached.wickets,
-                            overs = cached.overs
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time
                         )
                     }
 
@@ -85,7 +84,8 @@ class MatchApiRepository @Inject constructor(
         val cached = fixtureRepository.getScheduledFixtureById(matchId)
         return try {
             val token = authTokenProvider()
-            val response = apiService.getMatchState(matchId, token)
+            val serverMatchId = fixtureRepository.resolveServerMatchId(matchId) ?: return cached
+            val response = apiService.getMatchState(serverMatchId, token)
 
             if (response.isSuccessful) {
                 val body = response.body()
@@ -107,9 +107,7 @@ class MatchApiRepository @Inject constructor(
                             awayTeam = finalAway,
                             venue = if (fixture.venue.isBlank()) cached.venue else fixture.venue,
                             date = if (fixture.date.isBlank()) cached.date else fixture.date,
-                            time = if (fixture.time.isBlank()) cached.time else fixture.time,
-                            wickets = cached.wickets,
-                            overs = cached.overs
+                            time = if (fixture.time.isBlank()) cached.time else fixture.time
                         )
                     }
 
@@ -144,11 +142,6 @@ class MatchApiRepository @Inject constructor(
      * Returns new fixture if data changed, null otherwise.
      */
     suspend fun pollMatchState(matchId: String): ScheduledFixture? {
-        val currentCached = _matchCache.value[matchId]
-        val fresh = refreshMatchState(matchId)
-
-        return if (fresh != null && fresh != currentCached) {
-            fresh
-        } else null
+        return refreshMatchState(matchId)
     }
 }

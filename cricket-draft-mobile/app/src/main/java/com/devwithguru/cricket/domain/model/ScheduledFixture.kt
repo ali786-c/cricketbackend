@@ -12,6 +12,7 @@ data class ScheduledFixture(
     val ballType: String,
     val matchType: String,
     val wickets: Int,
+    val ballsPerOver: Int = 6,
     val venue: String,
     val date: String,
     val time: String,
@@ -42,5 +43,6 @@ data class ScheduledFixture(
     var firstInningsExtras: Int = 0,
     var secondInningsExtras: Int = 0,
     var firstInningsDotBalls: Int = 0,
-    var secondInningsDotBalls: Int = 0
+    var secondInningsDotBalls: Int = 0,
+    var playerServerIds: Map<String, Int> = emptyMap()
 )

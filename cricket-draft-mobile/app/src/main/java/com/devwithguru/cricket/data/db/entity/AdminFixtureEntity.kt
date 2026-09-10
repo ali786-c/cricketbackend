@@ -11,6 +11,8 @@ import androidx.room.PrimaryKey
 data class AdminFixtureEntity(
     @PrimaryKey val id: String,
     val serverId: Int? = null,
+    val serverMatchId: Int? = null,
+    val serverRevision: Int? = null,
     val tournamentId: String,
 
     // ── Stage Context (PRD §24) ──
@@ -51,5 +53,6 @@ data class AdminFixtureEntity(
 
     // ── Sync ──
     val syncStatus: String = "pending",
+    val syncError: String? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )

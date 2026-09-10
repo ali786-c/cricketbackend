@@ -36,11 +36,16 @@ data class PendingDeliveryEntity(
     val strikerId: Int = 0,
     val nonStrikerId: Int = 0,
     val bowlerId: Int = 0,
+    val strikerName: String = "",
+    val nonStrikerName: String = "",
+    val bowlerName: String = "",
 
     // Wicket info (null if no wicket)
     val wicketDismissedPlayerId: Int? = null,
+    val wicketDismissedPlayerName: String? = null,
     val wicketDismissalType: String? = null,
     val wicketFielderId: Int? = null,
+    val wicketFielderName: String? = null,
     val wicketRunsCompleted: Int = 0,
 
     // Ordering & dedup

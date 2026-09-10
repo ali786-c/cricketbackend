@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scoring\Services;
 
+use App\Modules\Scoring\Contracts\MatchConfiguration;
 use App\Models\AuditLog;
 use App\Models\CricketMatch;
 use App\Models\CricketRuleProfile;
@@ -94,7 +95,13 @@ class MatchService
                 'tournament_id' => $tournament ? $tournament->id : null,
                 'rule_profile_id' => $profile->id,
                 'rule_profile_version' => $profile->version,
-                'rule_snapshot' => $this->profileSnapshot($profile, $tournament?->ball_type ?? ($configuration['ball_type'] ?? null)),
+                'rule_snapshot' => $this->profileSnapshot(
+                    $profile,
+                    $tournament?->ball_type ?? ($configuration['ball_type'] ?? null),
+                    $tournament ? 'tournament' : 'custom',
+                    $tournament?->squad_size ?? ($configuration['squad_size'] ?? null),
+                    $effectiveOvers,
+                ),
                 'overs_per_innings' => $effectiveOvers,
                 'status' => 'squad_selection',
                 'revision' => 1,
@@ -124,6 +131,7 @@ class MatchService
 
     private function createCustomProfile(array $configuration, ?string $clientUuid): CricketRuleProfile
     {
+        $configuration = MatchConfiguration::fromArray($configuration)->toArray();
         $slug = 'custom-match-'.($clientUuid ?: (string) \Illuminate\Support\Str::uuid());
         return CricketRuleProfile::create([
             'name' => 'Custom Match Rules',
@@ -148,26 +156,13 @@ class MatchService
         ]);
     }
 
-    private function profileSnapshot(CricketRuleProfile $profile, ?string $ballType): array
+    private function profileSnapshot(CricketRuleProfile $profile, ?string $ballType, string $origin, ?int $squadSize, int $oversPerInnings): array
     {
         return [
             'profile_id' => $profile->id,
-            'version' => $profile->version,
-            'format' => strtolower($profile->format),
-            'innings_per_side' => $profile->innings_per_side,
-            'overs_per_innings' => $profile->overs_per_innings,
-            'playing_xi_size' => $profile->playing_xi_size,
-            'maximum_wickets' => $profile->maximum_wickets,
-            'legal_balls_per_over' => $profile->legal_balls_per_over,
-            'max_overs_per_bowler' => $profile->max_overs_per_bowler,
-            'ball_type' => $ballType ? strtolower($ballType) : null,
-            'no_ball_runs' => $profile->no_ball_runs,
-            'wide_runs' => $profile->wide_runs,
-            'wide_runs_to_batsman' => $profile->wide_runs_to_batsman,
-            'noball_runs_to_batsman' => $profile->noball_runs_to_batsman,
-            'last_man_standing' => $profile->last_man_standing,
-            'max_balls_per_over' => $profile->max_balls_per_over,
-            'max_runs_per_over' => $profile->max_runs_per_over,
+            ...MatchConfiguration::fromProfile($profile, $ballType, $origin, now()->toISOString())->toArray(),
+            'squad_size' => $squadSize,
+            'overs_per_innings' => $oversPerInnings,
         ];
     }
 

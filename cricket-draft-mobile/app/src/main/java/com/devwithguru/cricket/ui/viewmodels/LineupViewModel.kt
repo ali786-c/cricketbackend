@@ -6,6 +6,7 @@ import com.devwithguru.cricket.data.repository.PlayerRepository
 import com.devwithguru.cricket.data.repository.FixtureRepository
 import com.devwithguru.cricket.data.repository.TeamRepository
 import com.devwithguru.cricket.data.repository.TournamentRepository
+import com.devwithguru.cricket.data.repository.SearchApiRepository
 import com.devwithguru.cricket.data.sync.SyncManager
 import com.devwithguru.cricket.ui.feature.match.toss.PlayerSelectable
 import com.devwithguru.cricket.domain.model.RegisteredPlayer
@@ -31,7 +32,8 @@ class LineupViewModel @Inject constructor(
     private val fixtureRepository: FixtureRepository,
     private val teamRepository: TeamRepository,
     private val tournamentRepository: TournamentRepository,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    private val searchApiRepository: SearchApiRepository
 ) : ViewModel() {
 
     private val _homeSquad = MutableStateFlow<List<PlayerSelectable>>(emptyList())
@@ -127,7 +129,18 @@ class LineupViewModel @Inject constructor(
 
     fun searchPlayerById(id: String) {
         viewModelScope.launch {
-            _searchResult.value = playerRepository.findById(id)
+            val query = id.trim()
+            val serverPlayer = searchApiRepository.search(query, type = "players", limit = 10)
+                .getOrNull()?.players?.firstOrNull()
+            _searchResult.value = serverPlayer?.let {
+                RegisteredPlayer(
+                    id = it.id.toString(),
+                    uniqueCode = it.unique_code,
+                    name = it.full_name.orEmpty(),
+                    role = it.playing_role ?: "Batter",
+                    isRegistered = true
+                )
+            } ?: playerRepository.findById(query)
         }
     }
 

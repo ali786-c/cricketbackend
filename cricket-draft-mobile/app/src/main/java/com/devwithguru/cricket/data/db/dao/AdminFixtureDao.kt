@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AdminFixtureDao {
+    @Query("SELECT * FROM admin_fixtures ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<AdminFixtureEntity>>
+
+    @Query("SELECT * FROM admin_fixtures WHERE LOWER(status) = LOWER(:status) ORDER BY updatedAt DESC")
+    fun observeAllByStatus(status: String): Flow<List<AdminFixtureEntity>>
+
     @Query("SELECT * FROM admin_fixtures")
     suspend fun getAllAdminFixtures(): List<AdminFixtureEntity>
 
@@ -68,6 +74,12 @@ interface AdminFixtureDao {
     // ── Server ID mapping ──
     @Query("SELECT * FROM admin_fixtures WHERE serverId = :serverId LIMIT 1")
     suspend fun findByServerId(serverId: Int): AdminFixtureEntity?
+
+    @Query("SELECT * FROM admin_fixtures WHERE serverMatchId = :serverMatchId LIMIT 1")
+    suspend fun findByServerMatchId(serverMatchId: Int): AdminFixtureEntity?
+
+    @Query("UPDATE admin_fixtures SET serverMatchId = :serverMatchId, serverRevision = :revision, status = :status, syncStatus = 'synced', syncError = NULL, updatedAt = :updatedAt WHERE id = :localId")
+    suspend fun updateOperationalMatch(localId: String, serverMatchId: Int, revision: Int?, status: String, updatedAt: Long = System.currentTimeMillis())
 
     @Query("UPDATE admin_fixtures SET serverId = :serverId, syncStatus = :status, updatedAt = :updatedAt WHERE id = :localId")
     suspend fun updateServerIdAndSync(localId: String, serverId: Int, status: String, updatedAt: Long = System.currentTimeMillis())

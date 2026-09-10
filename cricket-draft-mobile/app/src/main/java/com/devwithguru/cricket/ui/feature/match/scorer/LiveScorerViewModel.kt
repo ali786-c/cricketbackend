@@ -13,6 +13,8 @@ import com.devwithguru.cricket.domain.model.BowlerState
 import com.devwithguru.cricket.domain.model.WicketEvent
 import com.devwithguru.cricket.domain.model.PartnershipEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -31,6 +33,8 @@ class LiveScorerViewModel @Inject constructor(
     var strikerServerId: Int = 0
     var nonStrikerServerId: Int = 0
     var bowlerServerId: Int = 0
+    private var playerServerIds: Map<String, Int> = emptyMap()
+    private var deliverySyncJob: Job? = null
 
     // Main game state
     var state by mutableStateOf(MatchScoringState())
@@ -75,7 +79,7 @@ class LiveScorerViewModel @Inject constructor(
      * Set server-side player IDs for sync (called when player roster is loaded).
      */
     fun setPlayerServerIds(ids: Map<String, Int>) {
-        // Called from parent when player IDs are resolved from the API
+        playerServerIds = ids
     }
 
     fun initialize(
@@ -128,22 +132,10 @@ class LiveScorerViewModel @Inject constructor(
 
         // Reset squads roster list
         battingSquadList.clear()
-        if (battingSquad.isNotEmpty()) {
-            battingSquadList.addAll(battingSquad)
-        } else {
-            battingSquadList.addAll(
-                listOf("Salman Ahmed", "Imran Khan", "Zain Abbas", "Farhan Saeed", "Asif Ali", "Kamran Akmal")
-            )
-        }
+        battingSquadList.addAll(battingSquad)
 
         bowlingSquadList.clear()
-        if (bowlingSquad.isNotEmpty()) {
-            bowlingSquadList.addAll(bowlingSquad)
-        } else {
-            bowlingSquadList.addAll(
-                listOf("Yasir Khan", "Sohail Tanvir", "Wahab Riaz", "Umaid Asif", "Haris Rauf")
-            )
-        }
+        bowlingSquadList.addAll(bowlingSquad)
 
         val loadedBatsmenMap = initialBatsmenStats.associateBy { it.name }
         val loadedBowlersMap = initialBowlersStats.associateBy { it.name }
@@ -848,6 +840,9 @@ class LiveScorerViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                val currentStrikerId = playerServerIds[state.batterStriker.name] ?: 0
+                val currentNonStrikerId = playerServerIds[state.batterNonStriker.name] ?: 0
+                val currentBowlerId = playerServerIds[state.bowler.name] ?: 0
                 deliverySyncRepository.saveDelivery(
                     PendingDeliveryEntity(
                         matchId = matchId,
@@ -858,9 +853,18 @@ class LiveScorerViewModel @Inject constructor(
                         byes = byes,
                         legByes = legByes,
                         penaltyRuns = penaltyRuns,
-                        strikerId = strikerServerId,
-                        nonStrikerId = nonStrikerServerId,
-                        bowlerId = bowlerServerId,
+                        strikerId = currentStrikerId,
+                        nonStrikerId = currentNonStrikerId,
+                        bowlerId = currentBowlerId,
+                        strikerName = state.batterStriker.name,
+                        nonStrikerName = state.batterNonStriker.name,
+                        bowlerName = state.bowler.name,
+                        wicketDismissedPlayerId = if (isWicket) dismissedPlayerName?.let { playerServerIds[it] } else null,
+                        wicketDismissedPlayerName = if (isWicket) dismissedPlayerName else null,
+                        wicketDismissalType = if (isWicket) dismissalType?.lowercase()?.replace(" ", "_") else null,
+                        wicketFielderId = if (isWicket) fielderName?.let { playerServerIds[it] } else null,
+                        wicketFielderName = if (isWicket) fielderName else null,
+                        wicketRunsCompleted = if (isWicket) runsOffBat else 0,
                         overNumber = state.totalBalls / ballsPerOver,
                         ballNumber = state.totalBalls % ballsPerOver,
                         cumulativeRuns = state.runs,
@@ -868,10 +872,24 @@ class LiveScorerViewModel @Inject constructor(
                         cumulativeBalls = state.totalBalls
                     )
                 )
+                scheduleDeliverySync()
             } catch (e: Exception) {
                 // Silently fail — delivery data is still in memory
                 // Will be retried on next scoring action or full sync
             }
+        }
+    }
+
+    /** Coalesce rapid scoring actions so slow requests never overlap. */
+    private fun scheduleDeliverySync() {
+        if (deliverySyncJob?.isActive == true || matchId.isBlank()) return
+        deliverySyncJob = viewModelScope.launch {
+            delay(400)
+            do {
+                val success = deliverySyncRepository.syncMatchDeliveries(matchId)
+                if (!success) break
+                delay(150)
+            } while (deliverySyncRepository.hasUnsyncedDeliveries(matchId))
         }
     }
 

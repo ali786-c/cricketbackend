@@ -61,6 +61,7 @@ fun TossLineupScreen(
 
     val homeSquadList by viewModel.homeSquad.collectAsState()
     val awaySquadList by viewModel.awaySquad.collectAsState()
+    val playerSearchResult by viewModel.searchResult.collectAsState()
 
     // Sync local state lists with ViewModel flows
     LaunchedEffect(homeSquadList) {
@@ -374,7 +375,7 @@ fun TossLineupScreen(
                 teamName = teams[addPlayerForTeam],
                 onDismiss = { showAddPlayerDialog = false },
                 onSearchPlayer = { id -> viewModel.searchPlayerById(id) },
-                searchResult = viewModel.searchResult.value,
+                searchResult = playerSearchResult,
                 onAddPlayer = { playerName, playerRole, existingId ->
                     val targetSquad = if (addPlayerForTeam == 0) homeSquad else awaySquad
                     if (existingId != null) {
@@ -496,6 +497,12 @@ private fun AddPlayerDialog(
     var searchId by remember { mutableStateOf("") }
     var foundPlayer by remember { mutableStateOf<RegisteredPlayer?>(null) }
     var searchError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(searchResult) {
+        if (searchResult != null) {
+            foundPlayer = searchResult
+            searchError = null
+        }
+    }
 
     // New player state
     var playerName by remember { mutableStateOf("") }
@@ -590,7 +597,7 @@ private fun AddPlayerDialog(
                                 searchError = null
                             },
                             label = { Text("Player ID", fontSize = 12.sp) },
-                            placeholder = { Text("e.g. h1, a2, p5", fontSize = 12.sp) },
+                            placeholder = { Text("6-digit Player ID or name", fontSize = 12.sp) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -609,14 +616,8 @@ private fun AddPlayerDialog(
                         OutlinedButton(
                             onClick = {
                                 onSearchPlayer(searchId.trim())
-                                val result = searchResult
-                                if (result != null) {
-                                    foundPlayer = result
-                                    searchError = null
-                                } else {
-                                    foundPlayer = null
-                                    searchError = "No registered player found with ID \"${searchId.trim()}\""
-                                }
+                                foundPlayer = null
+                                searchError = null
                             },
                             modifier = Modifier.fillMaxWidth().height(40.dp),
                             enabled = searchId.isNotBlank(),

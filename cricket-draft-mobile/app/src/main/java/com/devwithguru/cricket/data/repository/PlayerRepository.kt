@@ -20,7 +20,7 @@ class PlayerRepository @Inject constructor(
         }
 
     suspend fun findById(id: String): RegisteredPlayer? =
-        playerDao.findById(id)?.toDomain()
+        playerDao.searchOne(id)?.toDomain()
 
     suspend fun registerPlayer(name: String, role: String, isRegistered: Boolean = false, teamId: String? = null): RegisteredPlayer {
         val newId = (100000..999999).random().toString()

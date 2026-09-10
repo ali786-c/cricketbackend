@@ -585,6 +585,19 @@ interface ApiService {
         @Path("fixtureId") fixtureId: String
     ): Response<CreateMatchFromFixtureResponse>
 
+    @POST("api/v1/matches/{matchId}/start-custom")
+    suspend fun startCustomMatch(
+        @Header("Authorization") token: String,
+        @Path("matchId") matchId: String,
+        @Body request: StartCustomMatchRequest
+    ): Response<StartCustomMatchResponse>
+
+    @POST("api/v1/matches/{matchId}/next-innings")
+    suspend fun startNextInnings(
+        @Header("Authorization") token: String,
+        @Path("matchId") matchId: String
+    ): Response<SimpleMessageResponse>
+
     /**
      * Update a standalone/custom fixture status.
      * POST /api/v1/custom/fixtures/{fixtureId}/status
