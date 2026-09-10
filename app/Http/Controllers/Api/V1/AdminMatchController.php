@@ -10,6 +10,7 @@ use App\Models\Tournament;
 use App\Modules\Scoring\Services\MatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminMatchController extends Controller
 {
@@ -126,6 +127,75 @@ class AdminMatchController extends Controller
         $this->authorizeCustomMatch($match, $request);
         $data = $request->validate(['toss_winner_team_id' => ['required', 'integer'], 'toss_decision' => ['required', 'in:bat,field']]);
         return response()->json(['data' => $this->matches->recordToss($match, (int) $data['toss_winner_team_id'], $data['toss_decision'], (int) $request->user()->id)]);
+    }
+
+    public function startCustom(Request $request, CricketMatch $match): JsonResponse
+    {
+        $this->authorizeCustomMatch($match, $request);
+        abort_unless($match->tournament_id === null, 422, 'This endpoint only starts custom matches.');
+        $data = $request->validate([
+            'home_lineup' => ['required', 'array', 'min:2'],
+            'away_lineup' => ['required', 'array', 'min:2'],
+            'home_lineup.*.name' => ['required', 'string', 'max:150'],
+            'home_lineup.*.public_player_id' => ['nullable', 'string', 'size:6'],
+            'home_lineup.*.role' => ['nullable', 'string', 'max:50'],
+            'away_lineup.*.name' => ['required', 'string', 'max:150'],
+            'away_lineup.*.public_player_id' => ['nullable', 'string', 'size:6'],
+            'away_lineup.*.role' => ['nullable', 'string', 'max:50'],
+            'toss_winner' => ['required', 'in:home,away'],
+            'toss_decision' => ['required', 'in:bat,field'],
+        ]);
+
+        if ($match->status === 'live') {
+            return response()->json(['data' => $this->startedMatchData($match)]);
+        }
+
+        $fixture = $match->fixture()->with(['homeTeam', 'awayTeam'])->firstOrFail();
+        $required = (int) $match->ruleProfile()->value('playing_xi_size');
+        abort_unless(count($data['home_lineup']) === $required && count($data['away_lineup']) === $required, 422, "Each lineup must contain exactly {$required} players.");
+
+        DB::transaction(function () use ($match, $fixture, $data, $request) {
+            foreach ([[$fixture->home_team_id, $data['home_lineup']], [$fixture->away_team_id, $data['away_lineup']]] as [$teamId, $lineup]) {
+                $matchPlayerIds = collect($lineup)->map(function (array $item) use ($match, $teamId) {
+                    $profile = ! empty($item['public_player_id'])
+                        ? PlayerProfile::where('unique_code', $item['public_player_id'])->first()
+                        : null;
+                    $profile ??= PlayerProfile::firstOrCreate(
+                        ['full_name' => trim($item['name']), 'is_guest' => true],
+                        ['playing_role' => $item['role'] ?? 'Batter', 'is_active' => true]
+                    );
+                    return MatchPlayer::firstOrCreate(
+                        ['match_id' => $match->id, 'team_id' => $teamId, 'player_profile_id' => $profile->id],
+                        ['player_name_snapshot' => $profile->full_name, 'player_role_snapshot' => $profile->playing_role, 'selection_type' => 'squad']
+                    )->id;
+                })->all();
+                $this->matches->submitPlayingXi($match->fresh(), (int) $teamId, $matchPlayerIds, (int) $request->user()->id);
+            }
+            $this->matches->approveLineup($match->fresh(), (int) $request->user()->id);
+            $winnerId = $data['toss_winner'] === 'home' ? $fixture->home_team_id : $fixture->away_team_id;
+            $this->matches->recordToss($match->fresh(), (int) $winnerId, $data['toss_decision'], (int) $request->user()->id);
+        });
+
+        return response()->json(['data' => $this->startedMatchData($match->fresh())]);
+    }
+
+    private function startedMatchData(CricketMatch $match): array
+    {
+        $match->load(['players.team', 'players.playerProfile', 'innings.currentStriker', 'innings.currentNonStriker', 'innings.currentBowler']);
+        return [
+            'match_id' => $match->id,
+            'status' => $match->status,
+            'revision' => $match->revision,
+            'players' => $match->players->map(fn ($player) => [
+                'match_player_id' => $player->id,
+                'player_profile_id' => $player->player_profile_id,
+                'public_player_id' => $player->playerProfile?->unique_code,
+                'team_id' => $player->team_id,
+                'name' => $player->player_name_snapshot,
+                'role' => $player->player_role_snapshot,
+            ])->values(),
+            'current_innings_id' => $match->current_innings_id,
+        ];
     }
 
     public function toss(Request $request, Tournament $tournament, CricketMatch $match): JsonResponse

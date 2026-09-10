@@ -379,4 +379,44 @@ class CustomMatchSyncTest extends TestCase
             ->assertSee('Guest Allrounder')
             ->assertSee('Guest');
     }
+
+    public function test_mobile_custom_start_persists_lineups_toss_and_first_innings_idempotently(): void
+    {
+        [, $token] = $this->authenticatedUser();
+        $headers = ['Authorization' => 'Bearer '.$token];
+        $fixtureResponse = $this->postJson('/api/v1/custom/fixtures', [
+            'home_team_id' => 0,
+            'away_team_id' => 0,
+            'home_team_name' => 'HI',
+            'away_team_name' => 'HI2',
+            'scheduled_at' => '2026-09-12T16:00:00.000000Z',
+            'configuration' => [
+                'format' => 'custom', 'innings_per_side' => 1, 'overs_per_innings' => 2,
+                'playing_xi_size' => 2, 'maximum_wickets' => 1, 'legal_balls_per_over' => 6,
+                'max_overs_per_bowler' => 1, 'ball_type' => 'tennis',
+            ],
+        ], $headers)->assertCreated();
+        $matchResponse = $this->postJson('/api/v1/custom/fixtures/'.$fixtureResponse->json('data.id').'/create-match', [], $headers)->assertCreated();
+        $matchId = $matchResponse->json('data.match_id');
+        $payload = [
+            'home_lineup' => [['name' => 'HI Batter 1'], ['name' => 'HI Batter 2']],
+            'away_lineup' => [['name' => 'HI2 Bowler 1'], ['name' => 'HI2 Bowler 2']],
+            'toss_winner' => 'home',
+            'toss_decision' => 'bat',
+        ];
+
+        $this->postJson("/api/v1/matches/{$matchId}/start-custom", $payload, $headers)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'live')
+            ->assertJsonCount(4, 'data.players')
+            ->assertJsonPath('data.revision', 5);
+        $this->postJson("/api/v1/matches/{$matchId}/start-custom", $payload, $headers)
+            ->assertOk()->assertJsonPath('data.status', 'live');
+
+        $match = CricketMatch::findOrFail($matchId);
+        $this->assertNotNull($match->current_innings_id);
+        $this->assertNotNull($match->toss_recorded_at);
+        $this->assertSame(1, $match->innings()->count());
+        $this->assertSame(4, $match->players()->where('selection_type', 'playing_xi')->count());
+    }
 }
