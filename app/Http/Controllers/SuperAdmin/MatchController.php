@@ -6,10 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\CricketMatch;
 use App\Modules\Analytics\Services\MVPPointsService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class MatchController extends Controller
 {
+    public function state(CricketMatch $match): JsonResponse
+    {
+        return response()->json([
+            'revision' => (int) $match->revision,
+            'status' => $match->status,
+            'last_event_at' => $match->last_event_at?->toIso8601String(),
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $query = CricketMatch::with(['tournament', 'fixture.homeTeam', 'fixture.awayTeam'])->latest();

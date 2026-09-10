@@ -409,7 +409,7 @@ class CustomMatchSyncTest extends TestCase
             'toss_decision' => 'bat',
         ];
 
-        $this->postJson("/api/v1/matches/{$matchId}/start-custom", $payload, $headers)
+        $started = $this->postJson("/api/v1/matches/{$matchId}/start-custom", $payload, $headers)
             ->assertOk()
             ->assertJsonPath('data.status', 'live')
             ->assertJsonCount(4, 'data.players')
@@ -422,5 +422,25 @@ class CustomMatchSyncTest extends TestCase
         $this->assertNotNull($match->toss_recorded_at);
         $this->assertSame(1, $match->innings()->count());
         $this->assertSame(4, $match->players()->where('selection_type', 'playing_xi')->count());
+
+        $players = collect($started->json('data.players'))->keyBy('name');
+        $this->postJson("/api/v1/matches/{$matchId}/deliveries/sync", [
+            'deliveries' => [[
+                'local_uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'device_timestamp' => now()->toIso8601String(),
+                // Select the second listed batter as the mobile opener.
+                'striker_id' => $players['HI Batter 2']['match_player_id'],
+                'non_striker_id' => $players['HI Batter 1']['match_player_id'],
+                'bowler_id' => $players['HI2 Bowler 1']['match_player_id'],
+                'runs_off_bat' => 2,
+            ]],
+        ], $headers)
+            ->assertOk()
+            ->assertJsonPath('data.match.total_runs', 2)
+            ->assertJsonPath('data.match.legal_balls', 1)
+            ->assertJsonPath('data.match.revision', 6);
+
+        $this->assertSame(2, $match->innings()->firstOrFail()->fresh()->total_runs);
+        $this->assertSame(1, $match->deliveries()->count());
     }
 }

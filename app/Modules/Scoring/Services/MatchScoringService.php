@@ -83,13 +83,29 @@ class MatchScoringService
                 }
             }
 
+            // Older offline-first mobile builds captured the active pair after
+            // applying strike rotation. When that exact reversal is received,
+            // use the server-authoritative pre-delivery pair. New clients send
+            // the pre-delivery identities and pass through unchanged.
+            if ($latestDelivery
+                && $innings->current_striker_id
+                && $innings->current_non_striker_id
+                && (int) ($data['striker_id'] ?? 0) === (int) $innings->current_non_striker_id
+                && (int) ($data['non_striker_id'] ?? 0) === (int) $innings->current_striker_id) {
+                $data['striker_id'] = (int) $innings->current_striker_id;
+                $data['non_striker_id'] = (int) $innings->current_non_striker_id;
+            }
+
             $striker = $innings->match->players()->whereKey((int) ($data['striker_id'] ?? 0))->where('team_id', $innings->batting_team_id)->where('selection_type', 'playing_xi')->first();
             $nonStriker = $innings->match->players()->whereKey((int) ($data['non_striker_id'] ?? 0))->where('team_id', $innings->batting_team_id)->where('selection_type', 'playing_xi')->first();
             $bowler = $innings->match->players()->whereKey((int) ($data['bowler_id'] ?? 0))->where('team_id', $innings->bowling_team_id)->where('selection_type', 'playing_xi')->first();
             if (! $striker || ! $nonStriker || $striker->id === $nonStriker->id) $this->fail('players', 'Select two different batting players from the playing XI.');
             if (! $bowler) $this->fail('bowler_id', 'Select a bowler from the opposing playing XI.');
-            if ($innings->current_striker_id && (int) $innings->current_striker_id !== (int) $striker->id) $this->fail('striker_id', 'The striker does not match the current innings state.');
-            if ($innings->current_non_striker_id && (int) $innings->current_non_striker_id !== (int) $nonStriker->id) $this->fail('non_striker_id', 'The non-striker does not match the current innings state.');
+            // The mobile scorer chooses openers after the lifecycle start call.
+            // Accept that choice on the first delivery; after that the persisted
+            // innings state is authoritative and strictly validated.
+            if ($latestDelivery && $innings->current_striker_id && (int) $innings->current_striker_id !== (int) $striker->id) $this->fail('striker_id', 'The striker does not match the current innings state.');
+            if ($latestDelivery && $innings->current_non_striker_id && (int) $innings->current_non_striker_id !== (int) $nonStriker->id) $this->fail('non_striker_id', 'The non-striker does not match the current innings state.');
             if ($innings->current_bowler_id && (int) $innings->current_bowler_id !== (int) $bowler->id) $this->fail('bowler_id', 'The bowler cannot change during an over.');
             $bowlerLegalBalls = $innings->deliveries()->whereNull('voided_at')->where('bowler_id', $bowler->id)->where('is_legal_delivery', true)->count();
             if ($bowlerLegalBalls >= ((int) $profile->max_overs_per_bowler * (int) $profile->legal_balls_per_over)) {

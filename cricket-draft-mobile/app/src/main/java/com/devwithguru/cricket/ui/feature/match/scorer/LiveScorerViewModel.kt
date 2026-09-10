@@ -345,6 +345,9 @@ class LiveScorerViewModel @Inject constructor(
     fun recordRuns(runsToAdd: Int, onScoreChanged: (runs: Int, wickets: Int, overs: String, striker: String, nonStriker: String) -> Unit) {
         if (isScoringBlocked) return
         saveStateToHistory()
+        val deliveryStriker = state.batterStriker.name
+        val deliveryNonStriker = state.batterNonStriker.name
+        val deliveryBowler = state.bowler.name
 
         val nextTotalBalls = state.totalBalls + 1
         val isOverEnd = nextTotalBalls > 0 && nextTotalBalls % ballsPerOver == 0
@@ -397,7 +400,10 @@ class LiveScorerViewModel @Inject constructor(
         persistDelivery(
             runsOffBat = runsToAdd,
             extrasType = null,
-            extrasRuns = 0
+            extrasRuns = 0,
+            strikerName = deliveryStriker,
+            nonStrikerName = deliveryNonStriker,
+            bowlerName = deliveryBowler
         )
 
         triggerCallbacks(onScoreChanged)
@@ -412,6 +418,9 @@ class LiveScorerViewModel @Inject constructor(
             return
         }
         saveStateToHistory()
+        val deliveryStriker = state.batterStriker.name
+        val deliveryNonStriker = state.batterNonStriker.name
+        val deliveryBowler = state.bowler.name
 
         val isWide = extraType == "Wd"
         val isNoBall = extraType == "Nb"
@@ -473,7 +482,10 @@ class LiveScorerViewModel @Inject constructor(
         persistDelivery(
             runsOffBat = 0,
             extrasType = extraType,
-            extrasRuns = extraRuns
+            extrasRuns = extraRuns,
+            strikerName = deliveryStriker,
+            nonStrikerName = deliveryNonStriker,
+            bowlerName = deliveryBowler
         )
 
         triggerCallbacks(onScoreChanged)
@@ -488,6 +500,9 @@ class LiveScorerViewModel @Inject constructor(
     ) {
         if (isScoringBlocked) return
         saveStateToHistory()
+        val deliveryStriker = state.batterStriker.name
+        val deliveryNonStriker = state.batterNonStriker.name
+        val deliveryBowler = state.bowler.name
 
         val isWide = extraType == "Wd"
         val isNoBall = extraType == "Nb"
@@ -560,7 +575,10 @@ class LiveScorerViewModel @Inject constructor(
         persistDelivery(
             runsOffBat = batRuns,
             extrasType = if (extrasVal > 0) extraType else null,
-            extrasRuns = extrasVal
+            extrasRuns = extrasVal,
+            strikerName = deliveryStriker,
+            nonStrikerName = deliveryNonStriker,
+            bowlerName = deliveryBowler
         )
 
         triggerCallbacks(onScoreChanged)
@@ -579,6 +597,9 @@ class LiveScorerViewModel @Inject constructor(
     ) {
         if (isWicketRecordBlocked) return
         saveStateToHistory()
+        val deliveryStriker = state.batterStriker.name
+        val deliveryNonStriker = state.batterNonStriker.name
+        val deliveryBowler = state.bowler.name
 
         slotToReplace = if (dismissedName == state.batter1.name) 1 else 2
 
@@ -720,7 +741,10 @@ class LiveScorerViewModel @Inject constructor(
             isWicket = true,
             dismissalType = wicketType,
             dismissedPlayerName = dismissedName,
-            fielderName = fielderName
+            fielderName = fielderName,
+            strikerName = deliveryStriker,
+            nonStrikerName = deliveryNonStriker,
+            bowlerName = deliveryBowler
         )
 
         showWicketDialog = false
@@ -821,7 +845,10 @@ class LiveScorerViewModel @Inject constructor(
         isWicket: Boolean = false,
         dismissalType: String? = null,
         dismissedPlayerName: String? = null,
-        fielderName: String? = null
+        fielderName: String? = null,
+        strikerName: String,
+        nonStrikerName: String,
+        bowlerName: String
     ) {
         if (matchId.isBlank()) return // No match context set
 
@@ -840,9 +867,9 @@ class LiveScorerViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val currentStrikerId = playerServerIds[state.batterStriker.name] ?: 0
-                val currentNonStrikerId = playerServerIds[state.batterNonStriker.name] ?: 0
-                val currentBowlerId = playerServerIds[state.bowler.name] ?: 0
+                val currentStrikerId = playerServerIds[strikerName] ?: 0
+                val currentNonStrikerId = playerServerIds[nonStrikerName] ?: 0
+                val currentBowlerId = playerServerIds[bowlerName] ?: 0
                 deliverySyncRepository.saveDelivery(
                     PendingDeliveryEntity(
                         matchId = matchId,
@@ -856,9 +883,9 @@ class LiveScorerViewModel @Inject constructor(
                         strikerId = currentStrikerId,
                         nonStrikerId = currentNonStrikerId,
                         bowlerId = currentBowlerId,
-                        strikerName = state.batterStriker.name,
-                        nonStrikerName = state.batterNonStriker.name,
-                        bowlerName = state.bowler.name,
+                        strikerName = strikerName,
+                        nonStrikerName = nonStrikerName,
+                        bowlerName = bowlerName,
                         wicketDismissedPlayerId = if (isWicket) dismissedPlayerName?.let { playerServerIds[it] } else null,
                         wicketDismissedPlayerName = if (isWicket) dismissedPlayerName else null,
                         wicketDismissalType = if (isWicket) dismissalType?.lowercase()?.replace(" ", "_") else null,

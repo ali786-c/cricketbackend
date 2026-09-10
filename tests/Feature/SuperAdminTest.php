@@ -187,6 +187,11 @@ class SuperAdminTest extends TestCase
             ->assertSee('Super Stars')
             ->assertSee('Squads');
 
+        $this->actingAs($superAdmin)->getJson(route('super-admin.matches.state', $match))
+            ->assertOk()
+            ->assertJsonPath('revision', 6)
+            ->assertJsonPath('status', 'live');
+
         // A regular admin has no access to the super admin control plane.
         $this->actingAs($this->userWithRole('admin'))->get(route('super-admin.matches.show', $match))->assertForbidden();
     }

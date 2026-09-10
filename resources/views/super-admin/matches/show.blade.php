@@ -317,4 +317,29 @@
             </div>
         </div>
     </div>
+    @if($match->status === 'live')
+        <script>
+            (() => {
+                let revision = @json((int) $match->revision);
+                const stateUrl = @json(route('super-admin.matches.state', $match));
+                window.setInterval(async () => {
+                    if (document.hidden) return;
+                    try {
+                        const response = await fetch(stateUrl, {
+                            headers: {'Accept': 'application/json'},
+                            credentials: 'same-origin'
+                        });
+                        if (!response.ok) return;
+                        const state = await response.json();
+                        if (Number(state.revision) !== revision) {
+                            revision = Number(state.revision);
+                            window.location.reload();
+                        }
+                    } catch (_) {
+                        // A later poll retries transient connectivity failures.
+                    }
+                }, 2000);
+            })();
+        </script>
+    @endif
 </x-app-layout>

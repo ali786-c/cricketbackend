@@ -322,6 +322,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
     Route::get('tournaments', [SuperTournamentController::class, 'index'])->middleware('permission:manage system')->name('tournaments.index');
     Route::get('tournaments/{tournament}', [SuperTournamentController::class, 'show'])->middleware('permission:manage system')->name('tournaments.show');
     Route::get('matches', [SuperMatchController::class, 'index'])->middleware('permission:manage system')->name('matches.index');
+    Route::get('matches/{match}/state', [SuperMatchController::class, 'state'])->middleware('permission:manage system')->name('matches.state');
     Route::get('matches/{match}', [SuperMatchController::class, 'show'])->middleware('permission:manage system')->name('matches.show');
     Route::get('fixtures', [SuperFixtureController::class, 'index'])->middleware('permission:manage system')->name('fixtures.index');
     Route::get('teams', [SuperTeamController::class, 'index'])->middleware('permission:manage system')->name('teams.index');

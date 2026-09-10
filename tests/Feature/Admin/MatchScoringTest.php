@@ -73,6 +73,29 @@ class MatchScoringTest extends TestCase
         $this->assertSame($bowler->id, $afterUndo->current_bowler_id);
     }
 
+    public function test_mobile_selected_openers_are_accepted_on_the_first_delivery(): void
+    {
+        [$admin, $match, $innings, $batters, $bowler] = $this->liveMatch();
+        $innings->update([
+            'current_striker_id' => $batters[0]->id,
+            'current_non_striker_id' => $batters[1]->id,
+        ]);
+
+        app(\App\Modules\Scoring\Services\MatchScoringService::class)->recordDelivery($match, [
+            'striker_id' => $batters[1]->id,
+            'non_striker_id' => $batters[0]->id,
+            'bowler_id' => $bowler->id,
+            'runs_off_bat' => 2,
+        ], $admin->id, $match->revision);
+
+        $this->assertSame(2, $innings->fresh()->total_runs);
+        $this->assertDatabaseHas('match_deliveries', [
+            'innings_id' => $innings->id,
+            'striker_id' => $batters[1]->id,
+            'non_striker_id' => $batters[0]->id,
+        ]);
+    }
+
     public function test_wide_adds_runs_without_a_legal_ball(): void
     {
         [$admin, $match, $innings, $batters, $bowler] = $this->liveMatch();
