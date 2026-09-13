@@ -5,14 +5,18 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\CricketMatch;
 use App\Modules\Scoring\Services\MatchScoringService;
+use App\Modules\Scoring\Services\MatchResultService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ScoringController extends Controller
 {
-    public function __construct(private readonly MatchScoringService $scoring)
-    {
-    }
+    public function __construct(
+        private readonly MatchScoringService $scoring,
+        private readonly MatchResultService $results
+    ) {}
 
     public function store(Request $request, CricketMatch $match): JsonResponse
     {
@@ -33,8 +37,11 @@ class ScoringController extends Controller
     public function sync(Request $request, CricketMatch $match): JsonResponse
     {
         $validated = $request->validate([
+            'device_id' => ['nullable', 'string', 'max:191'],
+            'base_revision' => ['nullable', 'integer', 'min:0'],
             'deliveries' => ['required', 'array', 'min:1'],
             'deliveries.*.local_uuid' => ['required', 'string', 'uuid'],
+            'deliveries.*.local_sequence' => ['nullable', 'integer', 'min:1'],
             'deliveries.*.device_timestamp' => ['required', 'string'],
             'deliveries.*.striker_id' => ['required', 'integer'],
             'deliveries.*.non_striker_id' => ['required', 'integer', 'different:deliveries.*.striker_id'],
@@ -57,8 +64,9 @@ class ScoringController extends Controller
         ]);
 
         $actorId = (int) $request->user()->id;
+        $correlationId = $request->header('X-Correlation-ID', (string) Str::uuid());
 
-        $responseList = \DB::transaction(function () use ($match, $validated, $actorId) {
+        $responseList = \DB::transaction(function () use ($match, $validated, $actorId, $correlationId) {
             $match = CricketMatch::query()->lockForUpdate()->findOrFail($match->id);
             $localUuids = collect($validated['deliveries'])->pluck('local_uuid')->all();
             
@@ -71,8 +79,25 @@ class ScoringController extends Controller
 
             $newDeliveries = collect($validated['deliveries'])
                 ->filter(fn ($d) => !$existingDeliveries->has($d['local_uuid']))
-                ->sortBy('device_timestamp')
+                ->sortBy(fn ($delivery) => sprintf(
+                    '%020d:%s',
+                    $delivery['local_sequence'] ?? PHP_INT_MAX,
+                    $delivery['device_timestamp'],
+                ))
                 ->values();
+
+            if ($newDeliveries->isNotEmpty()
+                && isset($validated['base_revision'])
+                && (int) $validated['base_revision'] !== (int) $match->revision) {
+                Log::warning('match_sync_revision_conflict', [
+                    'correlation_id' => $correlationId,
+                    'server_match_id' => $match->id,
+                    'base_revision' => (int) $validated['base_revision'],
+                    'server_revision' => (int) $match->revision,
+                    'delivery_count' => $newDeliveries->count(),
+                ]);
+                abort(409, 'revision_conflict');
+            }
 
             $results = [];
 
@@ -106,6 +131,12 @@ class ScoringController extends Controller
 
         // Fetch fresh match metrics
         $match = $match->fresh();
+        Log::info('match_sync_completed', [
+            'correlation_id' => $correlationId,
+            'server_match_id' => $match->id,
+            'acknowledged_count' => count($responseList),
+            'revision' => $match->revision,
+        ]);
         $innings = $match->innings()->whereKey($match->current_innings_id)->first();
 
         return response()->json([
@@ -129,11 +160,34 @@ class ScoringController extends Controller
         return response()->json(['data' => ['innings_id' => $innings->id, 'match_id' => $match->id]]);
     }
 
+    public function submitResult(Request $request, CricketMatch $match): JsonResponse
+    {
+        $result = $this->results->submit($match, (int) $request->user()->id);
+        return response()->json([
+            'data' => $result,
+            'message' => 'Match result submitted for approval.'
+        ]);
+    }
+
     public function undo(Request $request, CricketMatch $match): JsonResponse
     {
-        $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:500']]);
-        $this->scoring->undoLastDelivery($match, (int) $request->user()->id, $validated['reason']);
-        return response()->json(['message' => 'The latest delivery was voided and the scorecard was rebuilt.']);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+            'client_uuid' => ['nullable', 'uuid'],
+        ]);
+        $clientUuid = $validated['client_uuid'] ?? null;
+        $existing = $clientUuid ? \App\Models\MatchDelivery::query()
+            ->where('match_id', $match->id)->where('undo_uuid', $clientUuid)->first() : null;
+        if (! $existing) {
+            $this->scoring->undoLastDelivery($match, (int) $request->user()->id, $validated['reason'], $clientUuid);
+        }
+        $match = $match->fresh();
+        $innings = $match->innings()->whereKey($match->current_innings_id)->first();
+        return response()->json(['data' => [
+            'id' => $match->id, 'status' => $match->status, 'revision' => $match->revision,
+            'total_runs' => $innings?->total_runs ?? 0, 'wickets' => $innings?->wickets ?? 0,
+            'legal_balls' => $innings?->legal_balls ?? 0,
+        ]]);
     }
 
     public function mvp(CricketMatch $match, \App\Modules\Analytics\Services\MVPPointsService $mvpService): JsonResponse

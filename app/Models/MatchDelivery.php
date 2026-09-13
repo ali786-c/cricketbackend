@@ -18,7 +18,7 @@ class MatchDelivery extends Model
         'striker_id', 'non_striker_id', 'bowler_id', 'runs_off_bat', 'wides',
         'no_balls', 'byes', 'leg_byes', 'penalty_runs', 'total_runs',
         'is_legal_delivery', 'wicket_id', 'commentary', 'recorded_by',
-        'recorded_at', 'revision', 'voided_at', 'void_reason',
+        'recorded_at', 'revision', 'voided_at', 'void_reason', 'undo_uuid',
         'local_uuid', 'device_timestamp', 'wagon_x', 'wagon_y',
     ];
 

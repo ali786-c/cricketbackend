@@ -11,7 +11,7 @@ class MatchController extends Controller
 {
     public function state(Request $request, CricketMatch $match): JsonResponse
     {
-        $match->load(['tournament', 'fixture.homeTeam', 'fixture.awayTeam', 'ruleProfile', 'players.team', 'tossWinner', 'innings.battingTeam', 'innings.bowlingTeam', 'innings.currentStriker', 'innings.currentNonStriker', 'innings.currentBowler', 'innings.battingStats.player', 'innings.bowlingStats.player', 'innings.deliveries.wicket']);
+        $match->load(['tournament', 'fixture.homeTeam', 'fixture.awayTeam', 'ruleProfile', 'players.team', 'tossWinner', 'innings.battingTeam', 'innings.bowlingTeam', 'innings.currentStriker', 'innings.currentNonStriker', 'innings.currentBowler', 'innings.battingStats.player', 'innings.bowlingStats.player', 'innings.deliveries.striker', 'innings.deliveries.nonStriker', 'innings.deliveries.wicket.dismissedPlayer']);
         $visibleStatus = in_array($match->status, ['live', 'completed', 'result_pending', 'approved'], true);
         $publiclyVisible = $match->tournament?->publiclyVisibleNow() === true && $visibleStatus;
         $user = $request->user('sanctum');
@@ -56,7 +56,9 @@ class MatchController extends Controller
                     'selection_type' => $player->selection_type,
                     'batting_order' => $player->batting_order,
                 ])->values(),
-                'innings' => $match->innings->map(fn ($inning) => [
+                'innings' => $match->innings->map(function ($inning) use ($ballsPerOver) {
+                    $progress = $this->inningsProgress($inning, $ballsPerOver);
+                    return [
                     'id' => $inning->id,
                     'number' => $inning->innings_number,
                     'batting_team' => ['id' => $inning->battingTeam?->id, 'name' => $inning->battingTeam?->name, 'short_name' => $inning->battingTeam?->short_name],
@@ -68,6 +70,9 @@ class MatchController extends Controller
                     'overs' => $inning->oversDisplay($ballsPerOver),
                     'target' => $inning->target_runs,
                     'status' => $inning->status,
+                    'extras' => $inning->deliveries->whereNull('voided_at')->sum(fn ($delivery) =>
+                        $delivery->wides + $delivery->no_balls + $delivery->byes + $delivery->leg_byes + $delivery->penalty_runs
+                    ),
                     'active_players' => [
                         'striker' => $this->playerData($inning->currentStriker),
                         'non_striker' => $this->playerData($inning->currentNonStriker),
@@ -96,9 +101,39 @@ class MatchController extends Controller
                         'notation' => $delivery->notation(),
                         'total_runs' => $delivery->total_runs,
                     ]),
-                ])->values(),
+                    'fall_of_wickets' => $progress['fall_of_wickets'],
+                    'partnerships' => $progress['partnerships'],
+                ]; })->values(),
             ],
         ]);
+    }
+
+    private function inningsProgress($inning, int $ballsPerOver): array
+    {
+        $runs = 0; $balls = 0; $partnershipRuns = 0; $partnershipBalls = 0;
+        $falls = []; $partnerships = [];
+        $deliveries = $inning->deliveries->whereNull('voided_at')->sortBy('sequence_number')->values();
+        foreach ($deliveries as $delivery) {
+            $runs += (int) $delivery->total_runs;
+            $partnershipRuns += (int) $delivery->total_runs;
+            if ($delivery->is_legal_delivery) { $balls++; $partnershipBalls++; }
+            if (! $delivery->wicket?->is_valid_wicket) continue;
+            $dismissed = $delivery->wicket->dismissedPlayer?->player_name_snapshot
+                ?? $delivery->striker?->player_name_snapshot ?? 'Batter';
+            $partner = $delivery->striker?->player_name_snapshot === $dismissed
+                ? $delivery->nonStriker?->player_name_snapshot : $delivery->striker?->player_name_snapshot;
+            $falls[] = ['wicket' => count($falls) + 1, 'score' => $runs,
+                'over' => intdiv($balls, $ballsPerOver).'.'.($balls % $ballsPerOver), 'batter' => $dismissed];
+            $partnerships[] = ['batters' => trim($dismissed.', '.$partner, ', '),
+                'runs' => $partnershipRuns, 'balls' => $partnershipBalls, 'wicket' => count($falls)];
+            $partnershipRuns = 0; $partnershipBalls = 0;
+        }
+        if ($partnershipRuns > 0 || $partnershipBalls > 0) {
+            $last = $deliveries->last();
+            $partnerships[] = ['batters' => trim(($last?->striker?->player_name_snapshot ?? '').', '.($last?->nonStriker?->player_name_snapshot ?? ''), ', '),
+                'runs' => $partnershipRuns, 'balls' => $partnershipBalls, 'wicket' => null];
+        }
+        return ['fall_of_wickets' => $falls, 'partnerships' => $partnerships];
     }
 
     private function teamData($team): ?array

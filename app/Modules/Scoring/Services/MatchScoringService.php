@@ -218,15 +218,18 @@ class MatchScoringService
         });
     }
 
-    public function undoLastDelivery(CricketMatch $match, int $actorId, string $reason): void
+    public function undoLastDelivery(CricketMatch $match, int $actorId, string $reason, ?string $undoUuid = null): void
     {
-        $this->database->transaction(function () use ($match, $actorId, $reason) {
+        $this->database->transaction(function () use ($match, $actorId, $reason, $undoUuid) {
             $match = CricketMatch::query()->with('ruleProfile')->lockForUpdate()->findOrFail($match->id);
+            if ($undoUuid && MatchDelivery::query()->where('match_id', $match->id)->where('undo_uuid', $undoUuid)->exists()) {
+                return;
+            }
             if (! in_array($match->status, ['live', 'innings_break'], true) || ! $match->current_innings_id) $this->fail('match', 'Only a live match delivery can be undone.');
             $innings = MatchInnings::query()->lockForUpdate()->findOrFail($match->current_innings_id);
             $delivery = $innings->deliveries()->whereNull('voided_at')->latest('sequence_number')->first();
             if (! $delivery) $this->fail('delivery', 'There is no delivery to undo.');
-            $delivery->update(['voided_at' => now(), 'void_reason' => $reason, 'revision' => $delivery->revision + 1]);
+            $delivery->update(['voided_at' => now(), 'void_reason' => $reason, 'undo_uuid' => $undoUuid, 'revision' => $delivery->revision + 1]);
             $this->recalculateInningsCache($innings);
             $innings->update([
                 'current_striker_id' => $delivery->striker_id,

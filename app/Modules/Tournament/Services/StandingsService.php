@@ -4,6 +4,7 @@ namespace App\Modules\Tournament\Services;
 
 use App\Models\Tournament;
 use App\Models\TournamentStanding;
+use App\Models\Team;
 use Illuminate\Database\DatabaseManager;
 
 class StandingsService
@@ -16,7 +17,15 @@ class StandingsService
     {
         $this->database->transaction(function () use ($tournamentId) {
             $tournament = Tournament::query()->with('cricketRuleProfile')->findOrFail($tournamentId);
-            $teams = $tournament->teams()->where('is_active', true)->get();
+            // Support both the canonical pivot membership and legacy/direct
+            // tournament_id ownership used by fixture and mobile creation.
+            $pivotTeams = $tournament->teams()->where('teams.is_active', true)->get();
+            $directTeams = Team::query()->where('tournament_id', $tournament->id)->where('is_active', true)->get();
+            $matchTeamIds = $tournament->matches()->with('innings:id,match_id,batting_team_id,bowling_team_id')
+                ->get()->flatMap(fn ($match) => $match->innings->flatMap(fn ($innings) => [$innings->batting_team_id, $innings->bowling_team_id]))
+                ->filter()->unique()->values();
+            $matchTeams = Team::query()->whereIn('id', $matchTeamIds)->where('is_active', true)->get();
+            $teams = $pivotTeams->concat($directTeams)->concat($matchTeams)->unique('id')->values();
             foreach ($teams as $team) {
                 TournamentStanding::updateOrCreate(['tournament_id' => $tournament->id, 'team_id' => $team->id], [
                     'played' => 0, 'wins' => 0, 'losses' => 0, 'ties' => 0, 'no_results' => 0,

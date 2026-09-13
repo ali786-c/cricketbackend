@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\CricketRuleProfile;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,12 +17,14 @@ class AdminTournamentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        return response()->json(['data' => Tournament::where('creator_id', $request->user()->id)->withCount(['teams', 'tournamentPlayers', 'fixtures', 'matches'])->latest()->paginate(20)]);
+        return response()->json(['data' => Tournament::where('creator_id', $request->user()->id)->with('cricketRuleProfile')->withCount(['teams', 'tournamentPlayers', 'fixtures', 'matches'])->latest()->paginate(20)]);
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $this->validated($request, true);
+        $profile = CricketRuleProfile::query()->findOrFail($data['cricket_rule_profile_id']);
+        $data['default_overs_per_innings'] = $profile->overs_per_innings;
         $data['is_public'] = $request->boolean('is_public', true);
         $data['has_draft'] = $request->boolean('has_draft', false);
         $data['ball_type'] = $request->input('ball_type', 'leather');
@@ -34,7 +37,7 @@ class AdminTournamentController extends Controller
         $data['banner_path'] = $request->hasFile('banner') ? $request->file('banner')->store('tournaments', 'public') : null;
         $data['creator_id'] = $request->user()->id;
         $tournament = Tournament::create(array_merge($data, ['status' => 'draft']));
-        return response()->json(['data' => $tournament, 'message' => 'Tournament created successfully.'], 201);
+        return response()->json(['data' => $tournament->load('cricketRuleProfile'), 'message' => 'Tournament created successfully.'], 201);
     }
 
     public function show(Tournament $tournament): JsonResponse
@@ -47,12 +50,20 @@ class AdminTournamentController extends Controller
         abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only modify tournaments you created.');
 
         $data = $this->validated($request, false);
-        if ($tournament->draft && $tournament->draft->status !== 'setup') {
+        $configurationIsInUse = ($tournament->draft && $tournament->draft->status !== 'setup')
+            || $tournament->fixtures()->exists()
+            || $tournament->matches()->exists();
+        if ($configurationIsInUse) {
             foreach (['squad_size', 'cricket_rule_profile_id', 'default_overs_per_innings'] as $field) {
                 if (array_key_exists($field, $data) && (int) $data[$field] !== (int) $tournament->{$field}) {
-                    throw ValidationException::withMessages([$field => 'This field is locked after draft setup begins.']);
+                    throw ValidationException::withMessages([$field => 'This field is locked after a draft, fixture, or match starts using this tournament configuration.']);
                 }
             }
+        }
+        if (array_key_exists('cricket_rule_profile_id', $data)) {
+            $data['default_overs_per_innings'] = CricketRuleProfile::query()
+                ->findOrFail($data['cricket_rule_profile_id'])
+                ->overs_per_innings;
         }
         $before = $tournament->only(array_keys($data));
         if ($request->boolean('remove_logo') && $tournament->logo_path) {
@@ -83,7 +94,7 @@ class AdminTournamentController extends Controller
             'data_source' => $request->input('data_source', $tournament->data_source),
         ]));
         AuditLog::create(['user_id' => $request->user()->id, 'tournament_id' => $tournament->id, 'action' => 'tournament.configuration_updated', 'before' => $before, 'after' => $tournament->fresh()->only(array_keys($before)), 'metadata' => ['source' => 'api'], 'ip_address' => $request->ip(), 'user_agent' => $request->userAgent()]);
-        return response()->json(['data' => $tournament->fresh(), 'message' => 'Tournament updated successfully.']);
+        return response()->json(['data' => $tournament->fresh()->load('cricketRuleProfile'), 'message' => 'Tournament updated successfully.']);
     }
 
     public function status(Request $request, Tournament $tournament): JsonResponse
@@ -122,7 +133,7 @@ class AdminTournamentController extends Controller
             'ball_type' => ['sometimes', 'string', 'in:leather,tennis,hard_ball,tape_ball,indoor'],
             'data_source' => ['sometimes', 'string', 'in:verified,manual'],
             'default_pick_duration' => [$creating ? 'required' : 'sometimes', 'integer', 'min:5', 'max:3600'],
-            'cricket_rule_profile_id' => ['nullable', 'integer', 'exists:cricket_rule_profiles,id'],
+            'cricket_rule_profile_id' => [$creating ? 'required' : 'sometimes', 'integer', Rule::exists('cricket_rule_profiles', 'id')->where('is_active', true)],
             'default_overs_per_innings' => ['nullable', 'integer', 'min:1', 'max:100'],
             'is_public' => ['sometimes', 'boolean'],
             'organizer_name' => ['nullable', 'string', 'max:200'],

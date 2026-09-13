@@ -34,6 +34,7 @@ class AdminApiTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         $headers = ['Authorization' => 'Bearer '.$admin->createToken('admin-mobile')->plainTextToken];
+        $profile = CricketRuleProfile::query()->where('slug', 't20-standard')->firstOrFail();
 
         $created = $this->withHeaders($headers)->postJson('/api/v1/admin/tournaments', [
             'name' => 'Mobile Admin Cup',
@@ -43,14 +44,61 @@ class AdminApiTest extends TestCase
             'squad_size' => 11,
             'default_pick_duration' => 60,
             'default_overs_per_innings' => 12,
+            'cricket_rule_profile_id' => $profile->id,
         ]);
 
-        $created->assertCreated()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.default_overs_per_innings', 12);
+        $created->assertCreated()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.cricket_rule_profile_id', $profile->id)
+            ->assertJsonPath('data.cricket_rule_profile.version', $profile->version)
+            ->assertJsonPath('data.default_overs_per_innings', $profile->overs_per_innings);
         $this->withHeaders($headers)->postJson('/api/v1/admin/tournaments/mobile-admin-cup/status', ['status' => 'registration'])
             ->assertOk()->assertJsonPath('data.status', 'registration');
         $this->withHeaders($headers)->postJson('/api/v1/admin/tournaments/mobile-admin-cup/status', ['status' => 'live'])
             ->assertOk()->assertJsonPath('data.status', 'live');
         $this->assertDatabaseHas('audit_logs', ['action' => 'tournament.status_changed']);
+    }
+
+    public function test_rule_profiles_endpoint_only_returns_active_profiles(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        CricketRuleProfile::query()->where('slug', 't20-standard')->update(['is_active' => false]);
+
+        $response = $this->withToken($admin->createToken('profiles')->plainTextToken)
+            ->getJson('/api/v1/admin/rule-profiles');
+
+        $response->assertOk();
+        $this->assertNotEmpty($response->json('data'));
+        $this->assertTrue(collect($response->json('data'))->every(fn (array $profile) => $profile['is_active'] === true));
+    }
+
+    public function test_rule_profile_is_required_and_locked_after_match_creation(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $profiles = CricketRuleProfile::query()->where('is_active', true)->take(2)->get();
+        $headers = ['Authorization' => 'Bearer '.$admin->createToken('rules-lock')->plainTextToken];
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/tournaments', [
+            'name' => 'Missing Profile Cup', 'slug' => 'missing-profile-cup',
+            'timezone' => 'Asia/Karachi', 'squad_size' => 11, 'default_pick_duration' => 60,
+        ])->assertUnprocessable()->assertJsonValidationErrors('cricket_rule_profile_id');
+
+        $tournament = Tournament::create([
+            'name' => 'Locked Rules Cup', 'slug' => 'locked-rules-cup', 'status' => 'ready',
+            'timezone' => 'Asia/Karachi', 'creator_id' => $admin->id,
+            'cricket_rule_profile_id' => $profiles[0]->id,
+        ]);
+        CricketMatch::create([
+            'tournament_id' => $tournament->id, 'rule_profile_id' => $profiles[0]->id,
+            'rule_profile_version' => $profiles[0]->version, 'overs_per_innings' => $profiles[0]->overs_per_innings,
+            'status' => 'squad_selection', 'revision' => 1, 'created_by' => $admin->id,
+        ]);
+
+        $this->withHeaders($headers)->patchJson('/api/v1/admin/tournaments/'.$tournament->slug, [
+            'cricket_rule_profile_id' => $profiles[1]->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors('cricket_rule_profile_id');
     }
 
     public function test_admin_can_approve_a_tournament_player_registration(): void

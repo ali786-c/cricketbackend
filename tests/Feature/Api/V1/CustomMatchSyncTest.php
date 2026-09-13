@@ -424,9 +424,11 @@ class CustomMatchSyncTest extends TestCase
         $this->assertSame(4, $match->players()->where('selection_type', 'playing_xi')->count());
 
         $players = collect($started->json('data.players'))->keyBy('name');
-        $this->postJson("/api/v1/matches/{$matchId}/deliveries/sync", [
+        $deliveryUuid = (string) \Illuminate\Support\Str::uuid();
+        $deliveryPayload = [
+            'base_revision' => 5,
             'deliveries' => [[
-                'local_uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'local_uuid' => $deliveryUuid,
                 'device_timestamp' => now()->toIso8601String(),
                 // Select the second listed batter as the mobile opener.
                 'striker_id' => $players['HI Batter 2']['match_player_id'],
@@ -434,7 +436,8 @@ class CustomMatchSyncTest extends TestCase
                 'bowler_id' => $players['HI2 Bowler 1']['match_player_id'],
                 'runs_off_bat' => 2,
             ]],
-        ], $headers)
+        ];
+        $this->postJson("/api/v1/matches/{$matchId}/deliveries/sync", $deliveryPayload, $headers)
             ->assertOk()
             ->assertJsonPath('data.match.total_runs', 2)
             ->assertJsonPath('data.match.legal_balls', 1)
@@ -442,5 +445,34 @@ class CustomMatchSyncTest extends TestCase
 
         $this->assertSame(2, $match->innings()->firstOrFail()->fresh()->total_runs);
         $this->assertSame(1, $match->deliveries()->count());
+
+        $this->getJson("/api/v1/matches/{$matchId}/state", $headers)
+            ->assertOk()
+            ->assertJsonPath('data.fixture.home_team.name', 'HI')
+            ->assertJsonPath('data.rule_snapshot.legal_balls_per_over', 6)
+            ->assertJsonPath('data.innings.0.runs', 2)
+            ->assertJsonPath('data.innings.0.batting.0.runs', 2)
+            ->assertJsonPath('data.innings.0.recent_deliveries.0.notation', '2')
+            ->assertJsonPath('data.innings.0.partnerships.0.runs', 2)
+            ->assertJsonCount(0, 'data.innings.0.fall_of_wickets');
+
+        // A stale retry of an acknowledged UUID remains idempotent, while a
+        // genuinely new stale event is stopped for operator reconciliation.
+        $this->postJson("/api/v1/matches/{$matchId}/deliveries/sync", $deliveryPayload, $headers)
+            ->assertOk()->assertJsonPath('data.deliveries.0.status', 'already_sync');
+        $stalePayload = $deliveryPayload;
+        $stalePayload['deliveries'][0]['local_uuid'] = (string) \Illuminate\Support\Str::uuid();
+        $this->postJson("/api/v1/matches/{$matchId}/deliveries/sync", $stalePayload, $headers)
+            ->assertConflict();
+        $this->assertSame(1, $match->deliveries()->count());
+
+        $undoUuid = (string) \Illuminate\Support\Str::uuid();
+        $undoPayload = ['reason' => 'Scorer corrected latest ball', 'client_uuid' => $undoUuid];
+        $firstUndo = $this->postJson("/api/v1/matches/{$matchId}/undo", $undoPayload, $headers)
+            ->assertOk()->assertJsonPath('data.total_runs', 0);
+        $revisionAfterUndo = $firstUndo->json('data.revision');
+        $this->postJson("/api/v1/matches/{$matchId}/undo", $undoPayload, $headers)
+            ->assertOk()->assertJsonPath('data.revision', $revisionAfterUndo);
+        $this->assertSame(1, $match->deliveries()->where('undo_uuid', $undoUuid)->count());
     }
 }

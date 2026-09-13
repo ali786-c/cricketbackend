@@ -75,10 +75,23 @@ class TournamentController extends Controller
             'starts_on' => $tournament->starts_on?->toDateString(),
             'ends_on' => $tournament->ends_on?->toDateString(),
             'rule_profile' => $tournament->cricketRuleProfile ? [
+                'id' => $tournament->cricketRuleProfile->id,
                 'name' => $tournament->cricketRuleProfile->name,
                 'format' => $tournament->cricketRuleProfile->format,
+                'innings_per_side' => $tournament->cricketRuleProfile->innings_per_side,
                 'overs_per_innings' => $tournament->cricketRuleProfile->overs_per_innings,
+                'playing_xi_size' => $tournament->cricketRuleProfile->playing_xi_size,
+                'maximum_wickets' => $tournament->cricketRuleProfile->maximum_wickets,
                 'legal_balls_per_over' => $tournament->cricketRuleProfile->legal_balls_per_over,
+                'max_overs_per_bowler' => $tournament->cricketRuleProfile->max_overs_per_bowler,
+                'no_ball_runs' => $tournament->cricketRuleProfile->no_ball_runs,
+                'wide_runs' => $tournament->cricketRuleProfile->wide_runs,
+                'wide_runs_to_batsman' => $tournament->cricketRuleProfile->wide_runs_to_batsman,
+                'noball_runs_to_batsman' => $tournament->cricketRuleProfile->noball_runs_to_batsman,
+                'last_man_standing' => $tournament->cricketRuleProfile->last_man_standing,
+                'max_balls_per_over' => $tournament->cricketRuleProfile->max_balls_per_over,
+                'max_runs_per_over' => $tournament->cricketRuleProfile->max_runs_per_over,
+                'version' => $tournament->cricketRuleProfile->version,
             ] : null,
         ];
         if ($detail) $data['fixtures_count'] = $tournament->fixtures()->count();
@@ -103,8 +116,29 @@ class TournamentController extends Controller
 
     public function squad(Team $team, \App\Modules\Analytics\Services\TeamComparisonService $teamService): JsonResponse
     {
+        $picks = \App\Models\DraftPick::query()
+            ->where('team_id', $team->id)
+            ->whereNotNull('tournament_player_id')
+            ->with('tournamentPlayer.playerProfile')
+            ->get();
         return response()->json([
-            'data' => $teamService->getClassifiedSquad($team)
+            'data' => [
+                'team_name' => $team->name,
+                'squad' => $picks->map(function ($pick) {
+                    $registration = $pick->tournamentPlayer;
+                    $profile = $registration?->playerProfile;
+                    return [
+                        'tournament_player_id' => $registration?->id,
+                        'player_profile_id' => $profile?->id,
+                        'player_name' => $profile?->full_name,
+                        'playing_role' => $profile?->playing_role,
+                        'public_player_id' => $profile?->unique_code,
+                        'is_captain' => (bool) $pick->is_captain,
+                        'is_vice_captain' => (bool) $pick->is_vice_captain,
+                        'is_wicketkeeper' => (bool) $pick->is_wicketkeeper,
+                    ];
+                })->filter(fn ($player) => $player['tournament_player_id'] && $player['player_profile_id'])->values(),
+            ],
         ]);
     }
 
