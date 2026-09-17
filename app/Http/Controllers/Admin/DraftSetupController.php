@@ -31,7 +31,7 @@ class DraftSetupController extends Controller
     public function update(StoreDraftSetupRequest $request, Tournament $tournament): RedirectResponse
     {
         $payload = $request->validated();
-        $teamIds = $tournament->teams()->pluck('id')->all();
+        $teamIds = $tournament->teams()->pluck('teams.id')->all();
         $pickNumbers = [];
 
         foreach ($payload['rounds'] as $round) {
@@ -113,7 +113,7 @@ class DraftSetupController extends Controller
             'rounds.*.picks.*.pick_duration' => ['nullable', 'integer', 'min:5', 'max:3600'],
         ]);
 
-        $teamIds = $tournament->teams()->pluck('id')->all();
+        $teamIds = $tournament->teams()->pluck('teams.id')->all();
         $pickNumbers = [];
         $defaultDuration = $tournament->default_pick_duration ?? 60;
 

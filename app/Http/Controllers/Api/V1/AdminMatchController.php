@@ -11,6 +11,7 @@ use App\Modules\Scoring\Services\MatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class AdminMatchController extends Controller
 {
@@ -18,8 +19,9 @@ class AdminMatchController extends Controller
     {
     }
 
-    public function index(Tournament $tournament): JsonResponse
+    public function index(Request $request, Tournament $tournament): JsonResponse
     {
+        $this->authorizeCreator($tournament, $request);
         return response()->json(['data' => $tournament->matches()->with(['fixture', 'ruleProfile', 'tossWinner', 'players.team'])->latest()->paginate(20)]);
     }
 
@@ -212,12 +214,12 @@ class AdminMatchController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage matches for tournaments you created.');
+        Gate::authorize('manageMatches', $tournament);
     }
 
     private function authorizeCustomMatch(CricketMatch $match, Request $request): void
     {
-        if ($match->tournament_id !== null) return;
-        abort_if((int) $match->created_by !== (int) $request->user()->id && ! $request->user()->hasRole('super_admin'), 403, 'You can only manage custom matches you created.');
+        abort_if($match->tournament_id !== null, 404);
+        Gate::authorize('manage', $match);
     }
 }

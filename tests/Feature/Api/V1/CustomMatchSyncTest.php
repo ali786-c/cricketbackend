@@ -446,15 +446,17 @@ class CustomMatchSyncTest extends TestCase
         $this->assertSame(2, $match->innings()->firstOrFail()->fresh()->total_runs);
         $this->assertSame(1, $match->deliveries()->count());
 
-        $this->getJson("/api/v1/matches/{$matchId}/state", $headers)
+        $stateResponse = $this->getJson("/api/v1/matches/{$matchId}/state", $headers)
             ->assertOk()
             ->assertJsonPath('data.fixture.home_team.name', 'HI')
             ->assertJsonPath('data.rule_snapshot.legal_balls_per_over', 6)
             ->assertJsonPath('data.innings.0.runs', 2)
-            ->assertJsonPath('data.innings.0.batting.0.runs', 2)
             ->assertJsonPath('data.innings.0.recent_deliveries.0.notation', '2')
             ->assertJsonPath('data.innings.0.partnerships.0.runs', 2)
             ->assertJsonCount(0, 'data.innings.0.fall_of_wickets');
+        $scoringBatter = collect($stateResponse->json('data.innings.0.batting'))
+            ->firstWhere('player', 'HI Batter 2');
+        $this->assertSame(2, $scoringBatter['runs']);
 
         // A stale retry of an acknowledged UUID remains idempotent, while a
         // genuinely new stale event is stopped for operator reconciliation.

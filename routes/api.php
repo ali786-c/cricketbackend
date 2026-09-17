@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\AdminTournamentController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DraftController;
 use App\Http\Controllers\Api\V1\MatchController;
+use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ScoringController;
@@ -44,7 +45,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('players/{playerProfile}/matches', [ProfileController::class, 'matches'])->name('api.v1.players.matches');
         Route::get('players/{playerProfile}/teams', [ProfileController::class, 'teams'])->name('api.v1.players.teams');
     Route::get('teams/{team}/squad', [TournamentController::class, 'squad'])->name('api.v1.teams.squad');
-    Route::post('teams/{team}/designations', [TournamentController::class, 'updateDesignations'])->middleware('auth:sanctum')->name('api.v1.teams.designations');
+    Route::post('teams/{team}/designations', [TournamentController::class, 'updateDesignations'])->middleware(['auth:sanctum', 'permission:manage tournaments', 'throttle:30,1'])->name('api.v1.teams.designations');
     Route::get('teams/compare', [TournamentController::class, 'compareTeams'])->name('api.v1.teams.compare');
     Route::get('search', [SearchController::class, 'search'])->name('api.v1.search');
     Route::get('search/lookup/{code}', [SearchController::class, 'lookup'])->name('api.v1.search.lookup');
@@ -53,7 +54,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('organizations', [OrganizationController::class, 'index'])->name('api.v1.organizations.index');
     Route::get('organizations/{organization}', [OrganizationController::class, 'show'])->name('api.v1.organizations.show');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'managed.owner'])->group(function () {
         Route::post('custom/teams', [CustomTeamController::class, 'store'])->name('api.v1.custom.teams.store');
         Route::post('custom/players', [\App\Http\Controllers\Api\V1\CustomPlayerController::class, 'store'])->name('api.v1.custom.players.store');
         Route::post('custom/fixtures', [CustomFixtureController::class, 'store'])->name('api.v1.custom.fixtures.store');
@@ -65,19 +66,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.v1.auth.logout-all');
         Route::get('profile', [ProfileController::class, 'show'])->name('api.v1.profile.show');
-        Route::match(['post', 'patch'], 'profile', [ProfileController::class, 'update'])->name('api.v1.profile.update');
-        Route::get('tournaments/{tournament}/registration', [RegistrationController::class, 'mine'])->name('api.v1.tournaments.registration.mine');
-        Route::post('custom/teams', [CustomTeamController::class, 'store'])->name('api.v1.custom.teams.store');
-        Route::post('custom/players', [\App\Http\Controllers\Api\V1\CustomPlayerController::class, 'store'])->name('api.v1.custom.players.store');
-        Route::post('custom/fixtures', [CustomFixtureController::class, 'store'])->name('api.v1.custom.fixtures.store');
-        Route::put('custom/fixtures/{fixture}', [CustomFixtureController::class, 'update'])->name('api.v1.custom.fixtures.update');
-        Route::post('custom/fixtures/{fixture}/status', [CustomFixtureController::class, 'status'])->name('api.v1.custom.fixtures.status');
-        Route::post('custom/fixtures/{fixture}/create-match', [CustomFixtureController::class, 'createMatch'])->name('api.v1.custom.fixtures.create-match');
-        Route::delete('custom/fixtures/{fixture}', [CustomFixtureController::class, 'destroy'])->name('api.v1.custom.fixtures.destroy');
-        Route::get('auth/me', [AuthController::class, 'me'])->name('api.v1.auth.me');
-        Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
-        Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.v1.auth.logout-all');
-        Route::get('profile', [ProfileController::class, 'show'])->name('api.v1.profile.show');
+        Route::get('me/tournaments', [MeController::class, 'tournaments'])->name('api.v1.me.tournaments');
+        Route::get('me/fixtures', [MeController::class, 'fixtures'])->name('api.v1.me.fixtures');
+        Route::get('me/matches', [MeController::class, 'matches'])->name('api.v1.me.matches');
         Route::match(['post', 'patch'], 'profile', [ProfileController::class, 'update'])->name('api.v1.profile.update');
         Route::get('tournaments/{tournament}/registration', [RegistrationController::class, 'mine'])->name('api.v1.tournaments.registration.mine');
         Route::post('tournaments/{tournament}/registration', [RegistrationController::class, 'store'])->middleware('throttle:20,1')->name('api.v1.tournaments.registration.store');
@@ -91,6 +82,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('matches/{match}/undo', [ScoringController::class, 'undo'])->middleware(['permission:control draft', 'throttle:30,1'])->name('api.v1.matches.undo');
         Route::get('matches/{match}/mvp', [ScoringController::class, 'mvp'])->name('api.v1.matches.mvp');
         Route::get('admin/tournaments', [AdminTournamentController::class, 'index'])->middleware('permission:manage tournaments')->name('api.v1.admin.tournaments.index');
+        Route::post('admin/tournaments', [AdminTournamentController::class, 'store'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.tournaments.store');
         Route::get('admin/rule-profiles', [RuleProfileController::class, 'index'])->middleware('permission:manage tournaments')->name('api.v1.admin.rule-profiles.index');
         Route::patch('admin/tournaments/{tournament}', [AdminTournamentController::class, 'update'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.tournaments.update');
         Route::post('admin/tournaments/{tournament}/status', [AdminTournamentController::class, 'status'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.tournaments.status');
@@ -131,9 +123,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('admin/tournaments/{tournament}/matches/{match}', [AdminMatchController::class, 'show'])->middleware('permission:manage tournaments')->name('api.v1.admin.matches.show');
         Route::patch('admin/tournaments/{tournament}/matches/{match}/overs', [AdminMatchController::class, 'updateOvers'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.overs');
         // Custom Match API route workarounds
-        Route::post('admin/tournaments/0/matches/{match}/teams/{team}/playing-xi', [AdminMatchController::class, 'customPlayingXi'])->name('api.v1.admin.custom-matches.playing-xi');
-        Route::post('admin/tournaments/0/matches/{match}/approve-lineup', [AdminMatchController::class, 'customApproveLineup'])->name('api.v1.admin.custom-matches.approve-lineup');
-        Route::post('admin/tournaments/0/matches/{match}/toss', [AdminMatchController::class, 'customToss'])->name('api.v1.admin.custom-matches.toss');
+        Route::post('admin/tournaments/0/matches/{match}/teams/{team}/playing-xi', [AdminMatchController::class, 'customPlayingXi'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.custom-matches.playing-xi');
+        Route::post('admin/tournaments/0/matches/{match}/approve-lineup', [AdminMatchController::class, 'customApproveLineup'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.custom-matches.approve-lineup');
+        Route::post('admin/tournaments/0/matches/{match}/toss', [AdminMatchController::class, 'customToss'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.custom-matches.toss');
         Route::post('matches/{match}/start-custom', [AdminMatchController::class, 'startCustom'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.matches.start-custom');
 
         Route::post('admin/tournaments/{tournament}/matches/{match}/teams/{team}/playing-xi', [AdminMatchController::class, 'playingXi'])->middleware(['permission:manage tournaments', 'throttle:30,1'])->name('api.v1.admin.matches.playing-xi');

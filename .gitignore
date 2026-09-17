@@ -25,6 +25,7 @@ Homestead.yaml
 Thumbs.db
 mcp.json
 .freebuff/
+/.tools/
 # Android sensitive files
 cricket-draft-mobile/local.properties
 cricket-draft-mobile/.gradle/

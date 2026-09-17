@@ -7,6 +7,7 @@ use App\Models\CricketMatch;
 use App\Modules\Scoring\Services\MatchScoringService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class MatchScoringController extends Controller
@@ -17,6 +18,7 @@ class MatchScoringController extends Controller
 
     public function show(CricketMatch $match): View
     {
+        Gate::authorize('score', $match);
         abort_unless($match->status === 'live', 409, 'Scoring is only available for a live match.');
         $match->load(['tournament', 'ruleProfile', 'players.team', 'innings.battingTeam', 'innings.bowlingTeam', 'innings.deliveries.striker', 'innings.deliveries.nonStriker', 'innings.deliveries.bowler', 'innings.deliveries.wicket']);
         $innings = $match->innings->firstWhere('id', $match->current_innings_id);
@@ -31,6 +33,7 @@ class MatchScoringController extends Controller
 
     public function store(Request $request, CricketMatch $match): RedirectResponse
     {
+        Gate::authorize('score', $match);
         $validated = $request->validate([
             'striker_id' => ['required', 'integer'],
             'non_striker_id' => ['required', 'integer', 'different:striker_id'],
@@ -56,12 +59,14 @@ class MatchScoringController extends Controller
 
     public function startNextInnings(Request $request, CricketMatch $match): RedirectResponse
     {
+        Gate::authorize('score', $match);
         $this->scoring->startNextInnings($match, (int) $request->user()->id);
         return back()->with('status', 'The next innings is live.');
     }
 
     public function undo(Request $request, CricketMatch $match): RedirectResponse
     {
+        Gate::authorize('score', $match);
         $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:500']]);
         $this->scoring->undoLastDelivery($match, (int) $request->user()->id, $validated['reason']);
         return back()->with('status', 'The latest delivery was voided and the scorecard was rebuilt.');

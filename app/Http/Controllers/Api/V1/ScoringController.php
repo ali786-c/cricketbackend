@@ -9,6 +9,7 @@ use App\Modules\Scoring\Services\MatchResultService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class ScoringController extends Controller
@@ -20,6 +21,7 @@ class ScoringController extends Controller
 
     public function store(Request $request, CricketMatch $match): JsonResponse
     {
+        Gate::authorize('score', $match);
         $validated = $request->validate([
             'striker_id' => ['required', 'integer'], 'non_striker_id' => ['required', 'integer', 'different:striker_id'], 'bowler_id' => ['required', 'integer'],
             'runs_off_bat' => ['nullable', 'integer', 'min:0', 'max:6'], 'wides' => ['nullable', 'integer', 'min:0', 'max:6'], 'no_balls' => ['nullable', 'integer', 'min:0', 'max:6'],
@@ -36,6 +38,7 @@ class ScoringController extends Controller
 
     public function sync(Request $request, CricketMatch $match): JsonResponse
     {
+        Gate::authorize('score', $match);
         $validated = $request->validate([
             'device_id' => ['nullable', 'string', 'max:191'],
             'base_revision' => ['nullable', 'integer', 'min:0'],
@@ -68,14 +71,23 @@ class ScoringController extends Controller
 
         $responseList = \DB::transaction(function () use ($match, $validated, $actorId, $correlationId) {
             $match = CricketMatch::query()->lockForUpdate()->findOrFail($match->id);
+            Gate::authorize('score', $match);
             $localUuids = collect($validated['deliveries'])->pluck('local_uuid')->all();
-            
-            // Find existing deliveries by local_uuid
-            $existingDeliveries = \App\Models\MatchDelivery::query()
-                ->where('match_id', $match->id)
+
+            // A local UUID is a global idempotency key. It may only ever be
+            // acknowledged for the same match and actor that first claimed it.
+            $claimedDeliveries = \App\Models\MatchDelivery::query()
                 ->whereIn('local_uuid', $localUuids)
                 ->get()
                 ->keyBy('local_uuid');
+            $hasForeignClaim = $claimedDeliveries->contains(fn ($delivery) =>
+                (int) $delivery->match_id !== (int) $match->id
+                || (int) $delivery->recorded_by !== $actorId
+            );
+            if ($hasForeignClaim) {
+                abort(409, 'idempotency_key_conflict');
+            }
+            $existingDeliveries = $claimedDeliveries;
 
             $newDeliveries = collect($validated['deliveries'])
                 ->filter(fn ($d) => !$existingDeliveries->has($d['local_uuid']))
@@ -156,12 +168,14 @@ class ScoringController extends Controller
 
     public function nextInnings(Request $request, CricketMatch $match): JsonResponse
     {
+        Gate::authorize('score', $match);
         $innings = $this->scoring->startNextInnings($match, (int) $request->user()->id);
         return response()->json(['data' => ['innings_id' => $innings->id, 'match_id' => $match->id]]);
     }
 
     public function submitResult(Request $request, CricketMatch $match): JsonResponse
     {
+        Gate::authorize('submitResult', $match);
         $result = $this->results->submit($match, (int) $request->user()->id);
         return response()->json([
             'data' => $result,
@@ -171,6 +185,7 @@ class ScoringController extends Controller
 
     public function undo(Request $request, CricketMatch $match): JsonResponse
     {
+        Gate::authorize('score', $match);
         $validated = $request->validate([
             'reason' => ['required', 'string', 'min:5', 'max:500'],
             'client_uuid' => ['nullable', 'uuid'],
@@ -199,6 +214,7 @@ class ScoringController extends Controller
 
     public function editDelivery(Request $request, \App\Models\MatchDelivery $matchDelivery, \App\Modules\Scoring\Services\MatchRecalculationService $recalcService): JsonResponse
     {
+        Gate::authorize('update', $matchDelivery);
         $validated = $request->validate([
             'striker_id' => ['sometimes', 'integer', 'exists:match_players,id'],
             'non_striker_id' => ['sometimes', 'integer', 'exists:match_players,id', 'different:striker_id'],

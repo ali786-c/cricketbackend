@@ -147,3 +147,15 @@ GET  /api/v1/super-admin/health
 ```
 
 User role changes and session containment actions write audit events. The platform refuses to remove the `super_admin` role from the last remaining Super Admin, and a Super Admin cannot remove their own Super Admin access. Health responses include database response time, queue counts, storage state, API route registration, application state, environment details, HTTPS posture, and debug-mode status.
+
+## Owner-scoped management collections
+
+The following endpoints require a bearer token and return only resources managed by the authenticated creator:
+
+```text
+GET /api/v1/me/tournaments
+GET /api/v1/me/fixtures
+GET /api/v1/me/matches
+```
+
+Each item includes `owner_user_id` and a server-derived `viewer_permissions` object. Match state and public tournament/fixture projections use the same capability keys: `can_view`, `can_manage`, `can_edit_fixture`, `can_manage_lineup`, `can_score`, and `can_submit_result`. Public visibility does not set mutation capabilities. `GET /api/v1/players/{playerProfile}/matches` is participation history and never grants management authority.

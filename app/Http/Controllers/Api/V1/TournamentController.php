@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tournament;
+use App\Support\ViewerPermissions;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 class TournamentController extends Controller
 {
@@ -57,6 +59,7 @@ class TournamentController extends Controller
             'away_team' => $fixture->awayTeam ? ['id' => $fixture->awayTeam->id, 'name' => $fixture->awayTeam->name, 'short_name' => $fixture->awayTeam->short_name] : null,
             'match_id' => $fixture->match?->id,
             'match_status' => $fixture->match?->status,
+            'viewer_permissions' => ViewerPermissions::forFixture(auth('sanctum')->user(), $fixture),
         ])->values()]);
     }
 
@@ -74,6 +77,7 @@ class TournamentController extends Controller
             'timezone' => $tournament->timezone,
             'starts_on' => $tournament->starts_on?->toDateString(),
             'ends_on' => $tournament->ends_on?->toDateString(),
+            'viewer_permissions' => ViewerPermissions::forTournament(auth('sanctum')->user(), $tournament),
             'rule_profile' => $tournament->cricketRuleProfile ? [
                 'id' => $tournament->cricketRuleProfile->id,
                 'name' => $tournament->cricketRuleProfile->name,
@@ -144,6 +148,7 @@ class TournamentController extends Controller
 
     public function updateDesignations(\Illuminate\Http\Request $request, Team $team): JsonResponse
     {
+        Gate::authorize('manage', $team);
         $validated = $request->validate([
             'captain_player_id' => ['nullable', 'integer', 'exists:tournament_players,id'],
             'vice_captain_player_id' => ['nullable', 'integer', 'exists:tournament_players,id', 'different:captain_player_id'],

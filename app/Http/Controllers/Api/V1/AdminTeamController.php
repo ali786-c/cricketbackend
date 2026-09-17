@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class AdminTeamController extends Controller
@@ -171,6 +172,6 @@ class AdminTeamController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage teams for tournaments you created.');
+        Gate::authorize('manageTeams', $tournament);
     }
 }

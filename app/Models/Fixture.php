@@ -26,6 +26,15 @@ class Fixture extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function (Fixture $fixture) {
+            if ($fixture->isDirty('created_by')) {
+                throw new \LogicException('Fixture ownership cannot be reassigned.');
+            }
+        });
+    }
+
     public function tournament(): BelongsTo { return $this->belongsTo(Tournament::class); }
     public function homeTeam(): BelongsTo { return $this->belongsTo(Team::class, 'home_team_id'); }
     public function awayTeam(): BelongsTo { return $this->belongsTo(Team::class, 'away_team_id'); }

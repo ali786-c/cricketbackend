@@ -7,6 +7,7 @@ use App\Models\CricketRuleProfile;
 use App\Models\Draft;
 use App\Models\DraftPick;
 use App\Models\DraftRound;
+use App\Models\Fixture;
 use App\Models\PlayerProfile;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -145,6 +146,80 @@ class AdminApiTest extends TestCase
         $match->update(['status' => 'live']);
         $this->withHeaders($headers)->patchJson('/api/v1/admin/tournaments/'.$tournament->slug.'/matches/'.$match->id.'/overs', ['overs_per_innings' => 10])
             ->assertStatus(422);
+    }
+
+    public function test_my_resources_and_viewer_permissions_are_scoped_to_the_authenticated_owner(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('admin');
+        $other = User::factory()->create();
+        $other->assignRole('admin');
+        $profile = CricketRuleProfile::query()->where('slug', 't20-standard')->firstOrFail();
+
+        $ownedTournament = Tournament::create([
+            'name' => 'Owner Only Cup', 'slug' => 'owner-only-cup', 'status' => 'live',
+            'is_public' => true, 'timezone' => 'Asia/Karachi', 'creator_id' => $owner->id,
+            'cricket_rule_profile_id' => $profile->id,
+        ]);
+        $otherTournament = Tournament::create([
+            'name' => 'Other User Cup', 'slug' => 'other-user-cup', 'status' => 'live',
+            'is_public' => true, 'timezone' => 'Asia/Karachi', 'creator_id' => $other->id,
+            'cricket_rule_profile_id' => $profile->id,
+        ]);
+        $home = Team::create(['name' => 'Owner Home', 'short_name' => 'OH', 'creator_id' => $owner->id]);
+        $away = Team::create(['name' => 'Owner Away', 'short_name' => 'OA', 'creator_id' => $owner->id]);
+        $fixture = Fixture::create([
+            'tournament_id' => $ownedTournament->id,
+            'home_team_id' => $home->id,
+            'away_team_id' => $away->id,
+            'scheduled_at' => now()->addDay(),
+            'timezone' => 'Asia/Karachi',
+            'created_by' => $owner->id,
+        ]);
+        $match = CricketMatch::create([
+            'fixture_id' => $fixture->id,
+            'tournament_id' => $ownedTournament->id,
+            'rule_profile_id' => $profile->id,
+            'rule_profile_version' => $profile->version,
+            'overs_per_innings' => 20,
+            'status' => 'live',
+            'revision' => 1,
+            'created_by' => $owner->id,
+        ]);
+        CricketMatch::create([
+            'tournament_id' => $otherTournament->id,
+            'rule_profile_id' => $profile->id,
+            'rule_profile_version' => $profile->version,
+            'overs_per_innings' => 20,
+            'status' => 'live',
+            'revision' => 1,
+            'created_by' => $other->id,
+        ]);
+
+        $ownerToken = $owner->createToken('owner-resources')->plainTextToken;
+        $this->withToken($ownerToken)->getJson('/api/v1/me/tournaments')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ownedTournament->id)
+            ->assertJsonPath('data.0.viewer_permissions.can_manage', true);
+        $this->withToken($ownerToken)->getJson('/api/v1/me/fixtures')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $fixture->id)
+            ->assertJsonPath('data.0.viewer_permissions.can_edit_fixture', true);
+        $this->withToken($ownerToken)->getJson('/api/v1/me/matches')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $match->id)
+            ->assertJsonPath('data.0.viewer_permissions.can_score', true);
+
+        Auth::forgetGuards();
+        $otherToken = $other->createToken('public-viewer')->plainTextToken;
+        $this->withToken($otherToken)->getJson("/api/v1/matches/{$match->id}/state")
+            ->assertOk()
+            ->assertJsonPath('data.viewer_permissions.can_manage', false)
+            ->assertJsonPath('data.viewer_permissions.can_score', false)
+            ->assertJsonPath('data.viewer_permissions.can_view', true);
     }
 
     public function test_super_admin_api_can_govern_users_and_tournaments(): void

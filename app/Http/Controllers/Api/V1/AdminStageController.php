@@ -7,6 +7,7 @@ use App\Models\Stage;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AdminStageController extends Controller
 {
@@ -112,6 +113,6 @@ class AdminStageController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage stages for tournaments you created.');
+        Gate::authorize('manage', $tournament);
     }
 }

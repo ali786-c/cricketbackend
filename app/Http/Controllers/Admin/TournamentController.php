@@ -19,10 +19,13 @@ use Illuminate\View\View;
 
 class TournamentController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         return view('admin.tournaments.index', [
-            'tournaments' => Tournament::query()->latest()->paginate(12),
+            'tournaments' => Tournament::query()
+                ->where('creator_id', $request->user()->id)
+                ->latest()
+                ->paginate(12),
         ]);
     }
 
@@ -43,6 +46,7 @@ class TournamentController extends Controller
         ]);
         $attributes = $this->normalizeRegistrationWindow($attributes);
         $attributes['status'] = 'draft';
+        $attributes['creator_id'] = $request->user()->id;
         $attributes['is_public'] = $request->boolean('is_public', true);
         $attributes['logo_path'] = $request->hasFile('logo') ? $request->file('logo')->store('tournaments', 'public') : null;
         $attributes['banner_path'] = $request->hasFile('banner') ? $request->file('banner')->store('tournaments', 'public') : null;

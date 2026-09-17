@@ -7,6 +7,7 @@ use App\Models\CricketMatch;
 use App\Modules\Scoring\Services\MatchResultService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AdminResultController extends Controller
 {
@@ -41,7 +42,6 @@ class AdminResultController extends Controller
 
     private function authorizeCreator(CricketMatch $match, Request $request): void
     {
-        $ownerId = $match->tournament?->creator_id ?? $match->created_by;
-        abort_if((int) $ownerId !== (int) $request->user()->id && ! $request->user()->hasRole('super_admin'), 403, 'You can only manage results for matches you created.');
+        Gate::authorize('manage', $match);
     }
 }

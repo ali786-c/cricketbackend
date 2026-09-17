@@ -7,6 +7,7 @@ use App\Models\Fixture;
 use App\Modules\Tournament\Services\FixtureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class CustomFixtureController extends Controller
 {
@@ -137,6 +138,6 @@ class CustomFixtureController extends Controller
     private function authorizeFixture(Fixture $fixture, Request $request): void
     {
         abort_if($fixture->tournament_id !== null, 404);
-        abort_if((int) $fixture->created_by !== (int) $request->user()->id && ! $request->user()->hasRole('super_admin'), 403, 'You can only manage custom fixtures you created.');
+        Gate::authorize('manage', $fixture);
     }
 }

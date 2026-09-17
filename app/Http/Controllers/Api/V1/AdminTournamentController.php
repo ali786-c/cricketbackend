@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -47,7 +48,7 @@ class AdminTournamentController extends Controller
 
     public function update(Request $request, Tournament $tournament): JsonResponse
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only modify tournaments you created.');
+        Gate::authorize('update', $tournament);
 
         $data = $this->validated($request, false);
         $configurationIsInUse = ($tournament->draft && $tournament->draft->status !== 'setup')
@@ -99,7 +100,7 @@ class AdminTournamentController extends Controller
 
     public function status(Request $request, Tournament $tournament): JsonResponse
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only modify tournaments you created.');
+        Gate::authorize('update', $tournament);
 
         $data = $request->validate(['status' => ['required', 'in:draft,registration,ready,live,completed,cancelled']]);
         $from = $tournament->status;

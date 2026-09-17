@@ -8,6 +8,7 @@ use App\Models\Tournament;
 use App\Modules\Tournament\Services\FixtureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AdminFixtureController extends Controller
 {
@@ -117,7 +118,7 @@ class AdminFixtureController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage fixtures for tournaments you created.');
+        Gate::authorize('manageFixtures', $tournament);
     }
 
     private function matchCreatedData($match): array

@@ -73,7 +73,7 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware(['auth', 'verified', 'role:admin'])
+Route::middleware(['auth', 'verified', 'role:admin|super_admin', 'managed.owner'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

@@ -112,7 +112,7 @@ class TournamentTest extends TestCase
         $admin->assignRole('admin');
         $profile = CricketRuleProfile::query()->where('slug', 't20-standard')->firstOrFail();
         $alternate = CricketRuleProfile::query()->where('slug', 'community-10-over')->firstOrFail();
-        $tournament = $this->createTournament('live');
+        $tournament = $this->createTournament('live', $admin);
         $tournament->update(['cricket_rule_profile_id' => $profile->id]);
         Draft::create(['tournament_id' => $tournament->id, 'status' => 'live', 'revision' => 1]);
 
@@ -137,7 +137,7 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('draft');
+        $tournament = $this->createTournament('draft', $admin);
 
         $this->actingAs($admin)->put(route('admin.tournaments.update', $tournament), [
             'name' => 'Updated Cup',
@@ -175,7 +175,7 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('draft');
+        $tournament = $this->createTournament('draft', $admin);
 
         $this->actingAs($admin)->get(route('admin.tournaments.show', $tournament))
             ->assertOk()
@@ -191,7 +191,7 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('draft');
+        $tournament = $this->createTournament('draft', $admin);
 
         $this->actingAs($admin)->post(route('admin.tournaments.status.transition', $tournament), ['status' => 'registration'])
             ->assertRedirect();
@@ -211,7 +211,7 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('ready');
+        $tournament = $this->createTournament('ready', $admin);
 
         $response = $this->actingAs($admin)->from(route('admin.tournaments.show', $tournament))
             ->post(route('admin.tournaments.status.transition', $tournament), ['status' => 'live']);
@@ -247,7 +247,8 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('live');
+        $tournament = $this->createTournament('live', $admin);
+        $tournament->update(['has_draft' => true]);
         $team = $tournament->teams()->create([
             'name' => 'Locked Team',
             'short_name' => 'LT',
@@ -296,7 +297,7 @@ class TournamentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $tournament = $this->createTournament('draft');
+        $tournament = $this->createTournament('draft', $admin);
 
         $response = $this->actingAs($admin)->post(route('admin.tournaments.status.transition', $tournament), ['status' => 'completed']);
 
@@ -308,7 +309,40 @@ class TournamentTest extends TestCase
         ]);
     }
 
-    private function createTournament(string $status): Tournament
+    public function test_another_admin_cannot_manage_or_list_the_owners_tournament(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('admin');
+        $other = User::factory()->create();
+        $other->assignRole('admin');
+        $tournament = $this->createTournament('draft', $owner);
+
+        $this->actingAs($other)
+            ->get(route('admin.tournaments.show', $tournament))
+            ->assertForbidden();
+        $this->actingAs($other)
+            ->get(route('admin.tournaments.fixtures.index', $tournament))
+            ->assertForbidden();
+        $this->actingAs($other)
+            ->post(route('admin.tournaments.status.transition', $tournament), ['status' => 'live'])
+            ->assertForbidden();
+        $this->actingAs($other)
+            ->get(route('admin.tournaments.index'))
+            ->assertOk()
+            ->assertDontSee($tournament->name);
+
+        $token = $other->createToken('cross-owner-test')->plainTextToken;
+        $this->withToken($token)
+            ->postJson("/api/v1/admin/tournaments/{$tournament->slug}/status", ['status' => 'live'])
+            ->assertForbidden();
+        $this->withToken($token)
+            ->getJson("/api/v1/admin/tournaments/{$tournament->slug}/teams")
+            ->assertForbidden();
+
+        $this->assertSame('draft', $tournament->fresh()->status);
+    }
+
+    private function createTournament(string $status, User $owner): Tournament
     {
         return Tournament::create([
             'name' => 'Lifecycle Cup '.uniqid(),
@@ -316,6 +350,7 @@ class TournamentTest extends TestCase
             'status' => $status,
             'squad_size' => 3,
             'default_pick_duration' => 60,
+            'creator_id' => $owner->id,
         ]);
     }
 }

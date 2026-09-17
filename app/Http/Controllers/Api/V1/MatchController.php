@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CricketMatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\ViewerPermissions;
 
 class MatchController extends Controller
 {
@@ -31,6 +32,8 @@ class MatchController extends Controller
                 'result_summary' => $match->result_summary,
                 'winner_team_id' => $match->winner_team_id,
                 'overs_per_innings' => (int) ($match->overs_per_innings ?: $match->ruleProfile?->overs_per_innings),
+                'owner_user_id' => $user ? ($match->tournament?->creator_id ?: $match->created_by) : null,
+                'viewer_permissions' => ViewerPermissions::forMatch($user, $match),
                 'fixture' => [
                     'id' => $match->fixture?->id,
                     'tournament_id' => $match->tournament_id,

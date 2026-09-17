@@ -8,6 +8,7 @@ use App\Models\TournamentPlayer;
 use App\Modules\Draft\Services\DraftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class AdminDraftController extends Controller
@@ -86,6 +87,6 @@ class AdminDraftController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage drafts for tournaments you created.');
+        Gate::authorize('manageDraft', $tournament);
     }
 }

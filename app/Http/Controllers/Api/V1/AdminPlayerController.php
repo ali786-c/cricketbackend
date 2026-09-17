@@ -7,6 +7,7 @@ use App\Models\Tournament;
 use App\Models\TournamentPlayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AdminPlayerController extends Controller
 {
@@ -82,6 +83,6 @@ class AdminPlayerController extends Controller
 
     private function authorizeCreator(Tournament $tournament, Request $request): void
     {
-        abort_if($tournament->creator_id !== $request->user()->id, 403, 'You can only manage players for tournaments you created.');
+        Gate::authorize('managePlayers', $tournament);
     }
 }

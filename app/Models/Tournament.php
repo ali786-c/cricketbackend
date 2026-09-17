@@ -66,6 +66,12 @@ class Tournament extends Model
                 $tournament->tournament_code = self::generateUniqueCode();
             }
         });
+
+        static::updating(function (Tournament $tournament) {
+            if ($tournament->isDirty('creator_id')) {
+                throw new \LogicException('Tournament ownership cannot be reassigned.');
+            }
+        });
     }
 
     /**

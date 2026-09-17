@@ -55,6 +55,15 @@ class CricketMatch extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function (CricketMatch $match) {
+            if ($match->isDirty('created_by')) {
+                throw new \LogicException('Match ownership cannot be reassigned.');
+            }
+        });
+    }
+
     public function tournament(): BelongsTo
     {
         return $this->belongsTo(Tournament::class);
