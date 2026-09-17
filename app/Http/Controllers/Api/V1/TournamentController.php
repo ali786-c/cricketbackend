@@ -127,6 +127,8 @@ class TournamentController extends Controller
             ->get();
         return response()->json([
             'data' => [
+                'team_id' => $team->id,
+                'team_unique_code' => $team->unique_code,
                 'team_name' => $team->name,
                 'squad' => $picks->map(function ($pick) {
                     $registration = $pick->tournamentPlayer;

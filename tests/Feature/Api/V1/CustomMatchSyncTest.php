@@ -158,16 +158,9 @@ class CustomMatchSyncTest extends TestCase
             'client_uuid' => $clientUuid,
             'configuration' => [
                 'format' => 'custom',
-                'innings_per_side' => 1,
                 'overs_per_innings' => 6,
-                'squad_size' => 8,
-                'playing_xi_size' => 6,
                 'maximum_wickets' => 5,
-                'legal_balls_per_over' => 6,
-                'max_overs_per_bowler' => 2,
                 'ball_type' => 'tennis',
-                'no_ball_runs' => 1,
-                'wide_runs' => 1,
             ],
         ];
 
@@ -191,9 +184,12 @@ class CustomMatchSyncTest extends TestCase
         $this->assertSame($clientUuid, $match->client_uuid);
         $this->assertSame(6, $match->overs_per_innings);
         $this->assertSame('custom', $match->rule_snapshot['format']);
+        $this->assertSame(1, $match->rule_snapshot['innings_per_side']);
         $this->assertSame(6, $match->rule_snapshot['playing_xi_size']);
-        $this->assertSame(8, $match->rule_snapshot['squad_size']);
+        $this->assertSame(6, $match->rule_snapshot['squad_size']);
         $this->assertSame(5, $match->rule_snapshot['maximum_wickets']);
+        $this->assertSame(6, $match->rule_snapshot['legal_balls_per_over']);
+        $this->assertNull($match->rule_snapshot['max_overs_per_bowler']);
         $this->assertSame('tennis', $match->rule_snapshot['ball_type']);
         $this->assertSame('custom', $match->rule_snapshot['origin']);
         $this->assertNotNull($match->rule_snapshot['locked_at']);
@@ -203,7 +199,7 @@ class CustomMatchSyncTest extends TestCase
         $this->assertSame(5, $match->fresh()->rule_snapshot['maximum_wickets']);
     }
 
-    public function test_custom_configuration_rejects_wickets_not_below_playing_xi(): void
+    public function test_custom_configuration_ignores_client_lineup_fields_and_derives_them_from_wickets(): void
     {
         [, $token] = $this->authenticatedUser();
 
@@ -217,14 +213,21 @@ class CustomMatchSyncTest extends TestCase
                 'format' => 'custom',
                 'innings_per_side' => 1,
                 'overs_per_innings' => 6,
-                'playing_xi_size' => 5,
-                'maximum_wickets' => 5,
-                'legal_balls_per_over' => 6,
+                'squad_size' => 20,
+                'playing_xi_size' => 11,
+                'maximum_wickets' => 3,
+                'legal_balls_per_over' => 8,
+                'max_overs_per_bowler' => 2,
                 'ball_type' => 'tennis',
             ],
-        ], ['Authorization' => 'Bearer '.$token])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('configuration.maximum_wickets');
+        ], ['Authorization' => 'Bearer '.$token])->assertCreated();
+
+        $configuration = Fixture::query()->latest('id')->firstOrFail()->configuration_snapshot;
+        $this->assertSame(4, $configuration['playing_xi_size']);
+        $this->assertSame(4, $configuration['squad_size']);
+        $this->assertSame(6, $configuration['legal_balls_per_over']);
+        $this->assertSame(1, $configuration['innings_per_side']);
+        $this->assertNull($configuration['max_overs_per_bowler']);
     }
 
     public function test_another_admin_cannot_manage_or_read_someone_elses_custom_match(): void

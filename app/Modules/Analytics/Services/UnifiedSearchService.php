@@ -96,7 +96,7 @@ class UnifiedSearchService
 
         // Check team
         if (str_starts_with($code, 'TEAM-')) {
-            $team = Team::where('unique_code', $code)->with('tournament')->first();
+            $team = Team::where('unique_code', $code)->first();
             if ($team) {
                 return [
                     'type' => 'team',

@@ -88,13 +88,13 @@ class CustomFixtureController extends Controller
             'client_uuid' => ['nullable', 'uuid'],
             'configuration' => ['nullable', 'array'],
             'configuration.format' => ['required_with:configuration', 'string', 'max:30'],
-            'configuration.innings_per_side' => ['required_with:configuration', 'integer', 'min:1', 'max:4'],
+            'configuration.innings_per_side' => ['sometimes', 'integer'],
             'configuration.overs_per_innings' => ['required_with:configuration', 'integer', 'min:1', 'max:100'],
-            'configuration.squad_size' => ['nullable', 'integer', 'min:2', 'max:200', 'gte:configuration.playing_xi_size'],
-            'configuration.playing_xi_size' => ['required_with:configuration', 'integer', 'min:2', 'max:99'],
-            'configuration.maximum_wickets' => ['required_with:configuration', 'integer', 'min:1', 'max:98', 'lt:configuration.playing_xi_size'],
-            'configuration.legal_balls_per_over' => ['required_with:configuration', 'integer', 'min:1', 'max:12'],
-            'configuration.max_overs_per_bowler' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'configuration.squad_size' => ['sometimes', 'nullable', 'integer'],
+            'configuration.playing_xi_size' => ['sometimes', 'integer'],
+            'configuration.maximum_wickets' => ['required_with:configuration', 'integer', 'min:1', 'max:98'],
+            'configuration.legal_balls_per_over' => ['sometimes', 'integer'],
+            'configuration.max_overs_per_bowler' => ['sometimes', 'nullable', 'integer'],
             'configuration.ball_type' => ['required_with:configuration', 'in:leather,tennis,hard_ball,tape_ball,indoor'],
             'configuration.no_ball_runs' => ['nullable', 'integer', 'min:0', 'max:10'],
             'configuration.wide_runs' => ['nullable', 'integer', 'min:0', 'max:10'],
@@ -106,6 +106,16 @@ class CustomFixtureController extends Controller
             'configuration.origin' => ['nullable', 'in:custom'],
             'configuration.version' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        if (isset($data['configuration'])) {
+            $wickets = (int) $data['configuration']['maximum_wickets'];
+            $lineupSize = $wickets + 1;
+            $data['configuration']['innings_per_side'] = strtolower((string) $data['configuration']['format']) === 'test' ? 2 : 1;
+            $data['configuration']['playing_xi_size'] = $lineupSize;
+            $data['configuration']['squad_size'] = $lineupSize;
+            $data['configuration']['legal_balls_per_over'] = 6;
+            $data['configuration']['max_overs_per_bowler'] = null;
+        }
 
         // Auto-create global teams if ID is 0 and name is provided
         if ($data['home_team_id'] === 0 && !empty($data['home_team_name'])) {

@@ -95,6 +95,27 @@ class ApiTest extends TestCase
         $this->getJson('/api/v1/tournaments')->assertOk()->assertJsonFragment(['name' => 'Visible Cup'])->assertJsonMissing(['name' => 'Private Cup']);
     }
 
+    public function test_team_unique_code_is_the_same_public_id_in_search_and_lookup(): void
+    {
+        $team = Team::create([
+            'name' => 'Canonical Team',
+            'short_name' => 'CT',
+            'unique_code' => 'TEAM-A1B2C',
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/v1/search?q=team-a1b2c&type=teams')
+            ->assertOk()
+            ->assertJsonPath('data.teams.0.id', $team->id)
+            ->assertJsonPath('data.teams.0.unique_code', 'TEAM-A1B2C');
+
+        $this->getJson('/api/v1/search/lookup/team-a1b2c')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'team')
+            ->assertJsonPath('data.data.id', $team->id)
+            ->assertJsonPath('data.data.unique_code', 'TEAM-A1B2C');
+    }
+
     public function test_authenticated_user_can_revoke_current_api_token(): void
     {
         $user = User::factory()->create(['password' => 'password']);
